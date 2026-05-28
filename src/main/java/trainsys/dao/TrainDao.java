@@ -1,0 +1,38 @@
+package trainsys.dao;
+
+import trainsys.model.AddTrainRequest;
+import trainsys.util.FixedString;
+import trainsys.util.TrainScheduler;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public class TrainDao {
+
+    private final SystemContextDao systemContextDao;
+
+    public TrainDao(SystemContextDao systemContextDao) {
+        this.systemContextDao = systemContextDao;
+    }
+
+    public void addTrain(AddTrainRequest request, int[] stationIds, int[] durations, int[] prices) {
+        systemContextDao.getTrainSystem().addTrainScheduler(
+                new FixedString(request.getTrainId()),
+                request.getSeatNum(),
+                request.getStartTime().trim(),
+                request.getStations().size(),
+                stationIds,
+                durations,
+                prices
+        );
+    }
+
+    public TrainScheduler getScheduler(String trainId) {
+        return systemContextDao.getTrainSystem().getSchedulerManager().getScheduler(new FixedString(trainId.trim()));
+    }
+
+    public List<TrainScheduler> getAllSchedulers() {
+        return systemContextDao.getTrainSystem().getSchedulerManager().getAllSchedulers();
+    }
+}

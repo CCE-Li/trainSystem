@@ -92,6 +92,10 @@ const store = useStore()
 const userInfo = computed(() => store.userInfo)
 const activeMenu = computed(() => route.path)
 
+/**
+ * 页面刷新后，如果本地还有 sessionId，就向后端确认它是否仍然有效。
+ * 这样可以避免前端本地状态和后端真实登录态不一致。
+ */
 const restoreSession = async () => {
   if (!store.sessionId) {
     return
@@ -119,6 +123,9 @@ const restoreSession = async () => {
   }
 }
 
+/**
+ * 即使后端登出请求失败，也强制清空前端本地会话，避免界面继续误判为已登录。
+ */
 const handleLogout = async () => {
   try {
     await axios.post('/api/user/logout', {}, {

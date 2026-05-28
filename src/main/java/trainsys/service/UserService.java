@@ -14,6 +14,10 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 用户认证服务。
+ * 这里统一处理登录、注册和会话映射，控制器只负责参数接收和响应返回。
+ */
 @Service
 public class UserService {
 
@@ -27,6 +31,10 @@ public class UserService {
         this.systemContextDao = systemContextDao;
     }
 
+    /**
+     * 校验账号密码并创建一条新的会话记录。
+     * 前端后续所有受保护接口都依赖这里返回的 sessionId。
+     */
     public ApiResponse<Map<String, Object>> login(LoginRequest request) {
         try {
             UserInfo currentUser = userDao.login(request);
@@ -46,6 +54,9 @@ public class UserService {
         }
     }
 
+    /**
+     * 注册新用户并返回系统生成的 6 位用户 ID。
+     */
     public ApiResponse<RegisterResponse> register(RegisterRequest request) {
         try {
             long userId = userDao.register(request);
@@ -55,6 +66,9 @@ public class UserService {
         }
     }
 
+    /**
+     * 删除会话记录，并通知底层 TrainSystem 清空当前内存登录态。
+     */
     public ApiResponse<String> logout(String sessionId) {
         sessionDao.remove(sessionId);
         userDao.logout();
@@ -65,11 +79,18 @@ public class UserService {
         return sessionDao.find(sessionId);
     }
 
+    /**
+     * 将 session 对应的用户重新绑定到 TrainSystem。
+     * 旧核心逻辑仍然依赖 currentUser，因此每次业务调用前都需要显式恢复。
+     */
     public void bindCurrentUser(String sessionId) {
         UserInfo user = getCurrentUser(sessionId);
         systemContextDao.getTrainSystem().setCurrentUser(user);
     }
 
+    /**
+     * 校验当前会话是否仍然有效，用于页面刷新后的状态恢复。
+     */
     public ApiResponse<UserInfoDTO> validateSession(String sessionId) {
         UserInfo user = getCurrentUser(sessionId);
         if (user == null) {

@@ -2,7 +2,7 @@ package trainsys.service;
 
 import trainsys.dao.RouteDao;
 import trainsys.model.ApiResponse;
-import trainsys.model.RouteQueryRequest;
+import trainsys.model.dto.RouteQueryRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

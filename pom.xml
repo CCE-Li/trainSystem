@@ -8,7 +8,7 @@
     <artifactId>trainSystem</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <description>火车票务管理系统</description>
+    <description>火车调度系统</description>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

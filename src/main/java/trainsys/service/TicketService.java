@@ -4,7 +4,14 @@ import trainsys.config.StaticConfig;
 import trainsys.dao.RouteDao;
 import trainsys.dao.TicketDao;
 import trainsys.dao.TrainDao;
-import trainsys.model.*;
+import trainsys.model.ApiResponse;
+import trainsys.model.TripInfo;
+import trainsys.model.UserInfo;
+import trainsys.model.dto.BuyTicketRequest;
+import trainsys.model.dto.RefundTicketRequest;
+import trainsys.model.dto.TicketInfoDTO;
+import trainsys.model.dto.TicketQueryRequest;
+import trainsys.model.dto.TripInfoDTO;
 import trainsys.util.TrainScheduler;
 import org.springframework.stereotype.Service;
 

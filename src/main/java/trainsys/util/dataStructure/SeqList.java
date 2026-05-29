@@ -1,10 +1,11 @@
-package trainsys.util;
+package trainsys.util.dataStructure;
 
 
 import lombok.Data;
+import trainsys.util.dataStructure.List;
 
 @Data
-public class SeqList<T> implements List<T>{
+public class SeqList<T> implements List<T> {
     T[] data;
     int currentLength;
     int maxSize;

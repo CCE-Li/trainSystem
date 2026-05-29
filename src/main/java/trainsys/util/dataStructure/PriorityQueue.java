@@ -1,6 +1,7 @@
-package trainsys.util;
+package trainsys.util.dataStructure;
 
 import lombok.Data;
+import trainsys.util.dataStructure.Queue;
 
 /**
  * 优先级队列（最小堆）

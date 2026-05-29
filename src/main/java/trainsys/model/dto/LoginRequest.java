@@ -1,4 +1,4 @@
-package trainsys.model;
+package trainsys.model.dto;
 
 import lombok.Data;
 

@@ -4,10 +4,10 @@ import trainsys.dao.SessionDao;
 import trainsys.dao.SystemContextDao;
 import trainsys.dao.UserDao;
 import trainsys.model.ApiResponse;
-import trainsys.model.LoginRequest;
-import trainsys.model.RegisterRequest;
-import trainsys.model.RegisterResponse;
-import trainsys.model.UserInfoDTO;
+import trainsys.model.dto.LoginRequest;
+import trainsys.model.dto.RegisterRequest;
+import trainsys.model.dto.RegisterResponse;
+import trainsys.model.dto.UserInfoDTO;
 import trainsys.model.UserInfo;
 import org.springframework.stereotype.Service;
 

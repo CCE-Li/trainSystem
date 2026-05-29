@@ -1,4 +1,4 @@
-package trainsys.util;
+package trainsys.util.dataStructure;
 
 import java.io.*;
 import java.util.Comparator;

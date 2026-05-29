@@ -1,4 +1,6 @@
-package trainsys.util;
+package trainsys.util.dataStructure;
+
+import trainsys.util.dataStructure.Queue;
 
 /**
  * 链式队列实现

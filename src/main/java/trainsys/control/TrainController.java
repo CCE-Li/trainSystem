@@ -1,8 +1,8 @@
 package trainsys.control;
 
-import trainsys.model.AddTrainRequest;
+import trainsys.model.dto.AddTrainRequest;
 import trainsys.model.ApiResponse;
-import trainsys.model.TrainSchedulerDTO;
+import trainsys.model.dto.TrainSchedulerDTO;
 import trainsys.service.TrainService;
 import org.springframework.web.bind.annotation.*;
 

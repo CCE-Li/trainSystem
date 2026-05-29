@@ -1,7 +1,7 @@
 package trainsys.control;
 
 import trainsys.model.ApiResponse;
-import trainsys.model.RouteQueryRequest;
+import trainsys.model.dto.RouteQueryRequest;
 import trainsys.service.RouteService;
 import org.springframework.web.bind.annotation.*;
 

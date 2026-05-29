@@ -1,4 +1,4 @@
-package trainsys.util;
+package trainsys.util.dataStructure;
 
 /**
  * 数据类型，包含键值对

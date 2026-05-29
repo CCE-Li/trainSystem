@@ -1,7 +1,7 @@
 package trainsys.dao;
 
-import trainsys.model.LoginRequest;
-import trainsys.model.RegisterRequest;
+import trainsys.model.dto.LoginRequest;
+import trainsys.model.dto.RegisterRequest;
 import trainsys.model.UserInfo;
 import trainsys.util.TrainSystem;
 import trainsys.util.Types;

@@ -2,6 +2,7 @@ package trainsys.util;
 
 import trainsys.config.StaticConfig;
 import trainsys.model.PurchaseInfo;
+import trainsys.util.dataStructure.LinkQueue;
 
 /**
  * 等待列表（先进先出）

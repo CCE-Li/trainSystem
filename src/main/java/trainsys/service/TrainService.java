@@ -1,8 +1,8 @@
 package trainsys.service;
 
-import trainsys.model.AddTrainRequest;
+import trainsys.model.dto.AddTrainRequest;
 import trainsys.model.ApiResponse;
-import trainsys.model.TrainSchedulerDTO;
+import trainsys.model.dto.TrainSchedulerDTO;
 import trainsys.util.TrainScheduler;
 import trainsys.util.Types.StationID;
 import org.springframework.stereotype.Service;

@@ -1,11 +1,11 @@
 package trainsys.control;
 
 import trainsys.model.ApiResponse;
-import trainsys.model.BuyTicketRequest;
-import trainsys.model.RefundTicketRequest;
-import trainsys.model.TicketInfoDTO;
-import trainsys.model.TicketQueryRequest;
-import trainsys.model.TripInfoDTO;
+import trainsys.model.dto.BuyTicketRequest;
+import trainsys.model.dto.RefundTicketRequest;
+import trainsys.model.dto.TicketInfoDTO;
+import trainsys.model.dto.TicketQueryRequest;
+import trainsys.model.dto.TripInfoDTO;
 import trainsys.service.TicketService;
 import org.springframework.web.bind.annotation.*;
 

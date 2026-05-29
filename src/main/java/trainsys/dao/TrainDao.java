@@ -1,6 +1,6 @@
 package trainsys.dao;
 
-import trainsys.model.AddTrainRequest;
+import trainsys.model.dto.AddTrainRequest;
 import trainsys.util.FixedString;
 import trainsys.util.TrainScheduler;
 import org.springframework.stereotype.Repository;

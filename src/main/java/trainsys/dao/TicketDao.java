@@ -1,8 +1,8 @@
 package trainsys.dao;
 
-import trainsys.model.BuyTicketRequest;
-import trainsys.model.RefundTicketRequest;
-import trainsys.model.TicketQueryRequest;
+import trainsys.model.dto.BuyTicketRequest;
+import trainsys.model.dto.RefundTicketRequest;
+import trainsys.model.dto.TicketQueryRequest;
 import trainsys.model.TripInfo;
 import trainsys.util.FixedString;
 import trainsys.util.Time;

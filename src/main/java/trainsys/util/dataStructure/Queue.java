@@ -1,4 +1,4 @@
-package trainsys.util;
+package trainsys.util.dataStructure;
 
 
 /**

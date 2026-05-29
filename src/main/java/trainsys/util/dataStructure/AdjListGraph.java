@@ -1,11 +1,13 @@
-package trainsys.util;
+package trainsys.util.dataStructure;
+
+import trainsys.util.dataStructure.Graph;
 
 import java.util.ArrayList;
 /**
  * 邻接表图的实现
  * @param <T> 权重类型
  */
-public class AdjListGraph<T> implements Graph<T>{
+public class AdjListGraph<T> implements Graph<T> {
     // 创建一个结点类
     public static class edgeNode<T> {
         int end;

@@ -1,8 +1,10 @@
 package trainsys.util;
 
 import trainsys.config.StaticConfig;
-import trainsys.model.PurchaseInfo; /**
-import trainsys.util.PriorityQueue;
+import trainsys.model.PurchaseInfo;
+import trainsys.util.dataStructure.PriorityQueue;
+
+/**
  * 优先级等待列表
  */
 public class PrioritizedWaitingList {

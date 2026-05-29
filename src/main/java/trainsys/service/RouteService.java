@@ -7,6 +7,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * 路线服务。
+ * 负责站点名称解析以及路径、连通性相关查询。
+ */
 @Service
 public class RouteService {
 
@@ -16,6 +20,9 @@ public class RouteService {
         this.routeDao = routeDao;
     }
 
+    /**
+     * 查询两个站点之间的全部可行路线。
+     */
     public ApiResponse<String> findAllRoute(RouteQueryRequest request) {
         try {
             Integer depId = routeDao.stationNameToId(request.getDepartureStation());
@@ -29,6 +36,10 @@ public class RouteService {
         }
     }
 
+    /**
+     * 查询两个站点之间的最优路线。
+     * 当偏好为 price 时按价格优化，否则按时间优化。
+     */
     public ApiResponse<String> findBestRoute(RouteQueryRequest request) {
         try {
             Integer depId = routeDao.stationNameToId(request.getDepartureStation());
@@ -43,6 +54,9 @@ public class RouteService {
         }
     }
 
+    /**
+     * 查询两个站点之间是否连通。
+     */
     public ApiResponse<Boolean> queryAccessibility(RouteQueryRequest request) {
         try {
             Integer depId = routeDao.stationNameToId(request.getDepartureStation());
@@ -56,6 +70,9 @@ public class RouteService {
         }
     }
 
+    /**
+     * 获取系统中的全部站点名称。
+     */
     public ApiResponse<List<String>> getAllStations() {
         try {
             return ApiResponse.success(routeDao.getAllStations());

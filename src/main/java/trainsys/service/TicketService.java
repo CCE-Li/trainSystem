@@ -5,13 +5,16 @@ import trainsys.dao.RouteDao;
 import trainsys.dao.TicketDao;
 import trainsys.dao.TrainDao;
 import trainsys.model.*;
-import trainsys.model.*;
 import trainsys.util.TrainScheduler;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 票务服务。
+ * 负责车票发布、停售、余票查询、购票、退票和订单查询等核心票务流程。
+ */
 @Service
 public class TicketService {
 
@@ -27,6 +30,9 @@ public class TicketService {
         this.userService = userService;
     }
 
+    /**
+     * 发布指定车次在某个发车时间的车票。
+     */
     public ApiResponse<String> releaseTicket(String sessionId, TicketQueryRequest request) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {
@@ -46,6 +52,9 @@ public class TicketService {
         }
     }
 
+    /**
+     * 停止销售指定班次的车票。
+     */
     public ApiResponse<String> expireTicket(String sessionId, TicketQueryRequest request) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -60,6 +69,9 @@ public class TicketService {
         }
     }
 
+    /**
+     * 查询指定车次在给定站点和发车时间下的剩余票数。
+     */
     public ApiResponse<Integer> queryRemainingTicket(String sessionId, TicketQueryRequest request) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -79,6 +91,9 @@ public class TicketService {
         }
     }
 
+    /**
+     * 执行购票流程，包含站点校验、车次校验和余票判断。
+     */
     public ApiResponse<String> buyTicket(String sessionId, BuyTicketRequest request) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -98,7 +113,7 @@ public class TicketService {
 
             int remaining = ticketDao.queryRemainingTicket(request.getTrainId(), request.getDepartureTime(), stationId);
             if (remaining < 0) {
-                return ApiResponse.error("该车次该时间的车票尚未发售，请先发售车票");
+                return ApiResponse.error("该车次该时间的车票尚未发售，请先发布车票");
             }
             if (remaining == 0) {
                 return ApiResponse.error("余票不足，无法购票");
@@ -113,6 +128,9 @@ public class TicketService {
         }
     }
 
+    /**
+     * 执行退票流程，并校验用户是否确实持有对应订单。
+     */
     public ApiResponse<String> refundTicket(String sessionId, RefundTicketRequest request) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {
@@ -154,6 +172,9 @@ public class TicketService {
         }
     }
 
+    /**
+     * 查询当前登录用户的订单，并转换为前端展示对象。
+     */
     public ApiResponse<List<TripInfoDTO>> queryMyOrders(String sessionId) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {
@@ -181,6 +202,10 @@ public class TicketService {
         }
     }
 
+    /**
+     * 获取车票列表。
+     * 管理员可以查看全部车票，普通用户只能查看已发布车票。
+     */
     public ApiResponse<List<TicketInfoDTO>> getTicketList(String sessionId) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {

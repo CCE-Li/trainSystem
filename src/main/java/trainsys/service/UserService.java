@@ -16,7 +16,7 @@ import java.util.Map;
 
 /**
  * 用户认证服务。
- * 这里统一处理登录、注册和会话映射，控制器只负责参数接收和响应返回。
+ * 统一处理登录、注册、会话映射和当前用户绑定逻辑。
  */
 @Service
 public class UserService {
@@ -32,8 +32,8 @@ public class UserService {
     }
 
     /**
-     * 校验账号密码并创建一条新的会话记录。
-     * 前端后续所有受保护接口都依赖这里返回的 sessionId。
+     * 校验账号密码并创建新的会话记录。
+     * 成功后返回会话 ID 和当前登录用户信息。
      */
     public ApiResponse<Map<String, Object>> login(LoginRequest request) {
         try {
@@ -55,7 +55,7 @@ public class UserService {
     }
 
     /**
-     * 注册新用户并返回系统生成的 6 位用户 ID。
+     * 注册新用户并返回系统生成的用户标识。
      */
     public ApiResponse<RegisterResponse> register(RegisterRequest request) {
         try {
@@ -67,7 +67,7 @@ public class UserService {
     }
 
     /**
-     * 删除会话记录，并通知底层 TrainSystem 清空当前内存登录态。
+     * 删除会话记录，并清理底层系统保存的当前登录态。
      */
     public ApiResponse<String> logout(String sessionId) {
         sessionDao.remove(sessionId);
@@ -75,13 +75,16 @@ public class UserService {
         return ApiResponse.success("退出登录成功", null);
     }
 
+    /**
+     * 根据会话 ID 获取当前用户。
+     */
     public UserInfo getCurrentUser(String sessionId) {
         return sessionDao.find(sessionId);
     }
 
     /**
-     * 将 session 对应的用户重新绑定到 TrainSystem。
-     * 旧核心逻辑仍然依赖 currentUser，因此每次业务调用前都需要显式恢复。
+     * 将会话对应的用户重新绑定到底层 TrainSystem 上下文。
+     * 旧核心逻辑依赖 currentUser，因此每次业务调用前都需要显式恢复。
      */
     public void bindCurrentUser(String sessionId) {
         UserInfo user = getCurrentUser(sessionId);
@@ -89,7 +92,7 @@ public class UserService {
     }
 
     /**
-     * 校验当前会话是否仍然有效，用于页面刷新后的状态恢复。
+     * 校验会话是否仍然有效，并返回最新用户信息。
      */
     public ApiResponse<UserInfoDTO> validateSession(String sessionId) {
         UserInfo user = getCurrentUser(sessionId);
@@ -99,6 +102,9 @@ public class UserService {
         return ApiResponse.success(toUserDTO(user));
     }
 
+    /**
+     * 将内部用户对象转换为前端使用的数据传输对象。
+     */
     private UserInfoDTO toUserDTO(UserInfo user) {
         UserInfoDTO userDTO = new UserInfoDTO();
         userDTO.setUserId(user.getUserID().value());

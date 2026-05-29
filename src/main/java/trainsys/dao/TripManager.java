@@ -10,6 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+/**
+ * 行程持久化管理器。
+ * 负责订单行程记录的新增、查询和删除。
+ */
 public class TripManager {
     private final TripInfoMapper tripInfoMapper;
 
@@ -17,6 +21,9 @@ public class TripManager {
         this.tripInfoMapper = tripInfoMapper;
     }
 
+    /**
+     * 为指定用户新增一条行程记录。
+     */
     public void addTrip(long userID, TripInfo trip) {
         TripInfoEntity entity = new TripInfoEntity();
         entity.setUserId(userID);
@@ -31,6 +38,9 @@ public class TripManager {
         tripInfoMapper.insert(entity);
     }
 
+    /**
+     * 查询指定用户的全部行程记录。
+     */
     public List<TripInfo> queryTrip(long userID) {
         List<TripInfoEntity> entities = tripInfoMapper.selectList(new QueryWrapper<TripInfoEntity>().eq("user_id", userID));
         List<TripInfo> trips = new ArrayList<>();
@@ -49,6 +59,9 @@ public class TripManager {
         return trips;
     }
 
+    /**
+     * 删除与给定行程完全匹配的一条订单记录。
+     */
     public void removeTrip(long userID, TripInfo trip) {
         tripInfoMapper.delete(new QueryWrapper<TripInfoEntity>()
                 .eq("user_id", userID)

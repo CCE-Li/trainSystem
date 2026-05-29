@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * 票务接口入口。
- * 所有接口都要求前端携带 Bearer Token，用于恢复当前登录用户后再执行业务。
+ * 除站点查询外，所有操作都要求前端携带 Bearer Token 用于确认当前登录用户。
  */
 @RestController
 @RequestMapping("/api/ticket")
@@ -26,7 +26,7 @@ public class TicketController {
     }
 
     /**
-     * 管理员发售某个车次在指定发车时间的票。
+     * 发布指定车次在某个发车时间的车票。
      */
     @PostMapping("/release")
     public ApiResponse<String> releaseTicket(
@@ -39,7 +39,7 @@ public class TicketController {
     }
 
     /**
-     * 管理员停止某个车次在指定发车时间的售票。
+     * 停止销售指定车次在某个发车时间的车票。
      */
     @PostMapping("/expire")
     public ApiResponse<String> expireTicket(
@@ -52,7 +52,7 @@ public class TicketController {
     }
 
     /**
-     * 查询指定车次、出发站和发车时间下的剩余票数。
+     * 查询指定车次、出发站和发车时间下的余票数量。
      */
     @PostMapping("/remaining")
     public ApiResponse<Integer> queryRemainingTicket(
@@ -66,7 +66,7 @@ public class TicketController {
 
     /**
      * 购票接口。
-     * 这里会进入后端排队/余票判定逻辑，而不是单纯的数据库插入。
+     * 服务端会执行余票校验、排队和订单写入等完整流程，而不是简单插入记录。
      */
     @PostMapping("/buy")
     public ApiResponse<String> buyTicket(
@@ -94,6 +94,7 @@ public class TicketController {
     /**
      * 查询当前登录用户的订单列表。
      */
+
     @GetMapping("/orders")
     public ApiResponse<List<TripInfoDTO>> queryMyOrders(
             @RequestHeader(value = "Authorization", required = false) String sessionId) {
@@ -104,7 +105,7 @@ public class TicketController {
     }
 
     /**
-     * 查询当前系统中已经发售的票务列表，供管理员查看。
+     * 查询系统中已发布的车票列表，供管理员查看。
      */
     @GetMapping("/list")
     public ApiResponse<List<TicketInfoDTO>> getTicketList(

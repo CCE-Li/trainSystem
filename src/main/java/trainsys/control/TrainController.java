@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * 车次管理接口。
- * 主要提供新增车次、查询单个车次和查看全量车次列表。
+ * 提供新增车次、查询单个车次以及查看全部车次列表的能力。
  */
 @RestController
 @RequestMapping("/api/train")
@@ -24,7 +24,7 @@ public class TrainController {
 
     /**
      * 新增车次。
-     * 只有管理员会在后续服务层权限校验中通过。
+     * 权限校验在服务层完成，仅管理员允许执行该操作。
      */
     @PostMapping("/add")
     public ApiResponse<String> addTrain(
@@ -50,7 +50,7 @@ public class TrainController {
     }
 
     /**
-     * 获取全部车次列表，供前端展示总览页。
+     * 获取全部车次列表，供前端展示总览页面。
      */
     @GetMapping("/list")
     public ApiResponse<List<TrainSchedulerDTO>> getAllTrains(

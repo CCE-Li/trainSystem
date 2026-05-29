@@ -11,6 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+/**
+ * 路线区段持久化管理器。
+ * 负责列车区段信息和站点连通分量信息的存取。
+ */
 public class RouteSectionManager {
     private final RouteSectionMapper routeSectionMapper;
     private final StationComponentMapper stationComponentMapper;
@@ -20,6 +24,9 @@ public class RouteSectionManager {
         this.stationComponentMapper = stationComponentMapper;
     }
 
+    /**
+     * 路线区段的轻量数据载体，供上层重建图结构时使用。
+     */
     public static class RouteSectionData {
         public final TrainID trainID;
         public final int departureID;
@@ -36,6 +43,9 @@ public class RouteSectionManager {
         }
     }
 
+    /**
+     * 保存一条列车运行区段记录。
+     */
     public void saveSection(TrainID trainID, int departureID, int arrivalID, int duration, int price) {
         RouteSectionEntity entity = new RouteSectionEntity();
         entity.setTrainId(trainID.toString());
@@ -46,6 +56,9 @@ public class RouteSectionManager {
         routeSectionMapper.insert(entity);
     }
 
+    /**
+     * 加载全部列车区段记录。
+     */
     public List<RouteSectionData> loadAllSections() {
         List<RouteSectionEntity> entities = routeSectionMapper.selectList(new QueryWrapper<>());
         List<RouteSectionData> result = new ArrayList<>();
@@ -61,6 +74,9 @@ public class RouteSectionManager {
         return result;
     }
 
+    /**
+     * 保存站点所属的连通分量编号。
+     */
     public void saveStationComponent(int stationId, int componentId) {
         StationComponentEntity entity = new StationComponentEntity();
         entity.setStationId(stationId);
@@ -72,10 +88,16 @@ public class RouteSectionManager {
         }
     }
 
+    /**
+     * 清空全部站点连通分量记录。
+     */
     public void clearStationComponents() {
         stationComponentMapper.delete(new QueryWrapper<>());
     }
 
+    /**
+     * 预留关闭钩子，当前无需额外清理。
+     */
     public void close() {
     }
 }

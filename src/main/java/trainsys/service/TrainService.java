@@ -13,6 +13,10 @@ import java.util.List;
 import trainsys.dao.RouteDao;
 import trainsys.dao.TrainDao;
 
+/**
+ * 车次服务。
+ * 负责车次新增、查询以及内部调度对象到 DTO 的转换。
+ */
 @Service
 public class TrainService {
 
@@ -26,6 +30,9 @@ public class TrainService {
         this.userService = userService;
     }
 
+    /**
+     * 新增车次，并对站点、时间格式等输入做基础校验。
+     */
     public ApiResponse<String> addTrain(String sessionId, AddTrainRequest request) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -62,6 +69,9 @@ public class TrainService {
         }
     }
 
+    /**
+     * 查询指定车次，并转换为前端可展示的结构。
+     */
     public ApiResponse<TrainSchedulerDTO> queryTrain(String sessionId, String trainId) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -80,6 +90,9 @@ public class TrainService {
         }
     }
 
+    /**
+     * 获取全部车次调度信息列表。
+     */
     public ApiResponse<List<TrainSchedulerDTO>> getAllTrainSchedulers(String sessionId) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -98,6 +111,9 @@ public class TrainService {
         }
     }
 
+    /**
+     * 将内部车次调度对象转换为接口返回对象。
+     */
     private TrainSchedulerDTO toDto(TrainScheduler scheduler) {
         TrainSchedulerDTO dto = new TrainSchedulerDTO();
         dto.setTrainId(scheduler.getTrainID().toString());

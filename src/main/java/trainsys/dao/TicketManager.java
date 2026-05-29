@@ -11,6 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+/**
+ * 车票持久化管理器。
+ * 负责车票库存记录的查询、更新、发布和列表读取。
+ */
 public class TicketManager {
     private final TicketInfoMapper ticketInfoMapper;
 
@@ -18,6 +22,9 @@ public class TicketManager {
         this.ticketInfoMapper = ticketInfoMapper;
     }
 
+    /**
+     * 查询指定区段的余票数量。
+     */
     public int querySeat(FixedString trainID, Time departureTime, int stationID) {
         TicketInfoEntity entity = ticketInfoMapper.selectOne(new QueryWrapper<TicketInfoEntity>()
                 .eq("train_id", trainID.toString())
@@ -27,6 +34,9 @@ public class TicketManager {
         return entity == null || entity.getSeatNum() == null ? -1 : entity.getSeatNum();
     }
 
+    /**
+     * 按增量方式更新余票，并返回对应票价。
+     */
     public int updateSeat(FixedString trainID, Time departureTime, int stationID, int delta) {
         TicketInfoEntity entity = ticketInfoMapper.selectOne(new QueryWrapper<TicketInfoEntity>()
                 .eq("train_id", trainID.toString())
@@ -42,6 +52,9 @@ public class TicketManager {
         return entity.getPrice() == null ? -1 : entity.getPrice();
     }
 
+    /**
+     * 根据车次调度信息发布整趟列车各区段的票务记录。
+     */
     public void releaseTicket(TrainScheduler scheduler, Time baseTime) {
         int passingStationNum = scheduler.getPassingStationNum();
         for (int i = 0; i + 1 < passingStationNum; i++) {
@@ -71,12 +84,18 @@ public class TicketManager {
         }
     }
 
+    /**
+     * 删除指定车次和发车时间下的全部票务记录。
+     */
     public void expireTicket(FixedString trainID, Time departureTime) {
         ticketInfoMapper.delete(new QueryWrapper<TicketInfoEntity>()
                 .eq("train_id", trainID.toString())
                 .eq("departure_time", departureTime.toString()));
     }
 
+    /**
+     * 获取所有已发布且余票合法的车票记录。
+     */
     public List<Object[]> getAllReleasedTickets() {
         List<TicketInfoEntity> entities = ticketInfoMapper.selectList(new QueryWrapper<TicketInfoEntity>()
                 .ge("seat_num", 0)
@@ -84,12 +103,18 @@ public class TicketManager {
         return toTicketRows(entities);
     }
 
+    /**
+     * 获取全部车票记录。
+     */
     public List<Object[]> getAllTickets() {
         List<TicketInfoEntity> entities = ticketInfoMapper.selectList(new QueryWrapper<TicketInfoEntity>()
                 .orderByAsc("train_id", "departure_time", "departure_station"));
         return toTicketRows(entities);
     }
 
+    /**
+     * 将实体列表转换为统一的数组结构，供上层组装 DTO。
+     */
     private List<Object[]> toTicketRows(List<TicketInfoEntity> entities) {
         List<Object[]> tickets = new ArrayList<>();
         for (TicketInfoEntity entity : entities) {

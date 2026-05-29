@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * 用户认证相关接口。
- * 负责登录、注册、会话校验和登出，供前端页面直接调用。
+ * 负责登录、注册、会话校验和登出，供前端直接调用。
  */
 @RestController
 @RequestMapping("/api/user")
@@ -26,7 +26,7 @@ public class UserController {
 
     /**
      * 登录接口。
-     * 支持用用户 ID 或用户名作为登录标识，成功后返回会话 ID 和用户信息。
+     * 支持使用用户 ID 或用户名作为登录标识，成功后返回会话 ID 和用户信息。
      */
     @PostMapping("/login")
     public ApiResponse<Map<String, Object>> login(@RequestBody LoginRequest request) {
@@ -35,7 +35,7 @@ public class UserController {
 
     /**
      * 注册接口。
-     * 用户只需提交用户名和密码，系统自动分配 6 位用户 ID。
+     * 用户提交用户名和密码后，系统自动分配 6 位用户 ID。
      */
     @PostMapping("/register")
     public ApiResponse<RegisterResponse> register(@RequestBody RegisterRequest request) {
@@ -56,7 +56,7 @@ public class UserController {
 
     /**
      * 会话校验接口。
-     * 页面刷新后前端会调用它恢复登录状态，并重新拿到最新用户信息。
+     * 页面刷新后前端可调用该接口恢复登录状态，并重新获取最新用户信息。
      */
     @GetMapping("/validate")
     public ApiResponse<UserInfoDTO> validate(

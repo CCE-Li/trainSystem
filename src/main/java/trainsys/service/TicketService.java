@@ -32,9 +32,6 @@ public class TicketService {
         this.userService = userService;
     }
 
-    /**
-     * 发布指定车次在某个发车时间的车票。
-     */
     public ApiResponse<String> releaseTicket(String sessionId, TicketQueryRequest request) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {
@@ -54,9 +51,6 @@ public class TicketService {
         }
     }
 
-    /**
-     * 停止销售指定班次的车票。
-     */
     public ApiResponse<String> expireTicket(String sessionId, TicketQueryRequest request) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -71,9 +65,6 @@ public class TicketService {
         }
     }
 
-    /**
-     * 查询指定车次在给定站点和发车时间下的剩余票数。
-     */
     public ApiResponse<Integer> queryRemainingTicket(String sessionId, TicketQueryRequest request) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -81,21 +72,31 @@ public class TicketService {
         userService.bindCurrentUser(sessionId);
 
         try {
-            Integer stationId = routeDao.stationNameToId(request.getDepartureStation());
-            if (stationId == null) {
+            Integer departureStationId = routeDao.stationNameToId(request.getDepartureStation());
+            if (departureStationId == null) {
                 return ApiResponse.error("站点不存在: " + request.getDepartureStation());
             }
+
+            Integer arrivalStationId = routeDao.stationNameToId(request.getArrivalStation());
+            if (arrivalStationId == null) {
+                return ApiResponse.error("站点不存在: " + request.getArrivalStation());
+            }
+
             return ApiResponse.success(
-                    ticketDao.queryRemainingTicket(request.getTrainId(), request.getDepartureTime(), stationId)
+                    ticketDao.queryRemainingTicket(
+                            request.getTrainId(),
+                            request.getDepartureTime(),
+                            departureStationId,
+                            arrivalStationId
+                    )
             );
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.error("查询余票失败: " + e.getMessage());
         } catch (Exception e) {
             return ApiResponse.error("查询余票失败: " + e.getMessage());
         }
     }
 
-    /**
-     * 执行购票流程，包含站点校验、车次校验和余票判断。
-     */
     public ApiResponse<String> buyTicket(String sessionId, BuyTicketRequest request) {
         if (userService.getCurrentUser(sessionId) == null) {
             return ApiResponse.error(401, "未登录");
@@ -108,9 +109,14 @@ public class TicketService {
                 return ApiResponse.error("购票数量必须大于 0");
             }
 
-            Integer stationId = routeDao.stationNameToId(request.getDepartureStation());
-            if (stationId == null) {
+            Integer departureStationId = routeDao.stationNameToId(request.getDepartureStation());
+            if (departureStationId == null) {
                 return ApiResponse.error("站点不存在: " + request.getDepartureStation());
+            }
+
+            Integer arrivalStationId = routeDao.stationNameToId(request.getArrivalStation());
+            if (arrivalStationId == null) {
+                return ApiResponse.error("站点不存在: " + request.getArrivalStation());
             }
 
             TrainScheduler scheduler = trainDao.getScheduler(request.getTrainId());
@@ -118,26 +124,28 @@ public class TicketService {
                 return ApiResponse.error("车次不存在: " + request.getTrainId());
             }
 
-            int remaining = ticketDao.queryRemainingTicket(request.getTrainId(), request.getDepartureTime(), stationId);
+            int remaining = ticketDao.queryRemainingTicket(
+                    request.getTrainId(),
+                    request.getDepartureTime(),
+                    departureStationId,
+                    arrivalStationId
+            );
             if (remaining < 0) {
-                return ApiResponse.error("该车次该时间的车票尚未发售，请先发布车票");
+                return ApiResponse.error("该车次该区间的车票尚未发售，请先发布车票");
             }
             if (remaining < quantity) {
                 return ApiResponse.error("余票不足，无法购票");
             }
 
-            ticketDao.orderTicket(request, stationId);
+            ticketDao.orderTicket(request, departureStationId, arrivalStationId, quantity);
             return ApiResponse.success("购票成功", null);
         } catch (IllegalArgumentException e) {
-            return ApiResponse.error("时间格式错误: " + e.getMessage());
+            return ApiResponse.error("购票失败: " + e.getMessage());
         } catch (Exception e) {
             return ApiResponse.error("购票失败: " + e.getMessage());
         }
     }
 
-    /**
-     * 执行退票流程，并校验用户是否确实持有对应订单。
-     */
     public ApiResponse<String> refundTicket(String sessionId, RefundTicketRequest request) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {
@@ -151,15 +159,21 @@ public class TicketService {
                 return ApiResponse.error("退票数量必须大于 0");
             }
 
-            Integer stationId = routeDao.stationNameToId(request.getDepartureStation());
-            if (stationId == null) {
+            Integer departureStationId = routeDao.stationNameToId(request.getDepartureStation());
+            if (departureStationId == null) {
                 return ApiResponse.error("站点不存在: " + request.getDepartureStation());
+            }
+
+            Integer arrivalStationId = routeDao.stationNameToId(request.getArrivalStation());
+            if (arrivalStationId == null) {
+                return ApiResponse.error("站点不存在: " + request.getArrivalStation());
             }
 
             int ownedCount = 0;
             for (TripInfo trip : ticketDao.queryUserTrips(user.getUserID().value())) {
                 if (trip.getTrainID().toString().equals(request.getTrainId())
-                        && trip.getDepartureStation().value() == stationId
+                        && trip.getDepartureStation().value() == departureStationId
+                        && trip.getArrivalStation().value() == arrivalStationId
                         && trip.getDepartureTime().toString().equals(request.getDepartureTime())
                         && trip.getType() > 0) {
                     ownedCount += trip.getType();
@@ -177,18 +191,15 @@ public class TicketService {
                 return ApiResponse.error("车次不存在: " + request.getTrainId());
             }
 
-            ticketDao.refundTicket(request, stationId);
+            ticketDao.refundTicket(request, departureStationId, arrivalStationId, quantity);
             return ApiResponse.success("退票成功", null);
         } catch (IllegalArgumentException e) {
-            return ApiResponse.error("时间格式错误: " + e.getMessage());
+            return ApiResponse.error("退票失败: " + e.getMessage());
         } catch (Exception e) {
             return ApiResponse.error("退票失败: " + e.getMessage());
         }
     }
 
-    /**
-     * 查询当前登录用户的订单，并转换为前端展示对象。
-     */
     public ApiResponse<List<TripInfoDTO>> queryMyOrders(String sessionId) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {
@@ -220,17 +231,12 @@ public class TicketService {
                     dto.setRefundableCount((dto.getRefundableCount() == null ? 0 : dto.getRefundableCount()) + trip.getTicketNumber());
                 }
             }
-            List<TripInfoDTO> dtos = new ArrayList<>(grouped.values());
-            return ApiResponse.success(dtos);
+            return ApiResponse.success(new ArrayList<>(grouped.values()));
         } catch (Exception e) {
             return ApiResponse.error("查询订单失败: " + e.getMessage());
         }
     }
 
-    /**
-     * 获取车票列表。
-     * 管理员可以查看全部车票，普通用户只能查看已发布车票。
-     */
     public ApiResponse<List<TicketInfoDTO>> getTicketList(String sessionId) {
         UserInfo user = userService.getCurrentUser(sessionId);
         if (user == null) {

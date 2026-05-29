@@ -3,12 +3,12 @@ package trainsys.model;
 import lombok.Data;
 
 /**
- * 查询余票请求DTO
+ * 余票查询请求 DTO。
  */
 @Data
 public class TicketQueryRequest {
     private String trainId;
-    private String departureTime;  // HH:MM MM-DD格式
-    private String departureStation;  // 站点名称
+    private String departureTime;
+    private String departureStation;
+    private String arrivalStation;
 }
-

@@ -4,8 +4,8 @@
       <div class="brand">
         <div class="brand-mark">TS</div>
         <div>
-          <p class="brand-title">Train System</p>
-          <p class="brand-subtitle">票务运营控制台</p>
+          <p class="brand-title">火车调度系统</p>
+          <p class="brand-subtitle">列车运行与调度控制台</p>
         </div>
       </div>
 
@@ -58,8 +58,8 @@
     <main class="main-panel">
       <header class="topbar">
         <div>
-          <h1>火车票务管理系统</h1>
-          <p>统一处理查询、购票、订单与运维管理</p>
+          <h1>火车调度系统</h1>
+          <p>统一处理列车调度、路线查询与运营管理</p>
         </div>
 
         <div v-if="userInfo" class="user-panel">
@@ -79,49 +79,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
 import { useStore } from './store'
 
 const router = useRouter()
-const route = useRoute()
 const store = useStore()
 
 const userInfo = computed(() => store.userInfo)
-const activeMenu = computed(() => route.path)
-
-/**
- * 页面刷新后，如果本地还有 sessionId，就向后端确认它是否仍然有效。
- * 这样可以避免前端本地状态和后端真实登录态不一致。
- */
-const restoreSession = async () => {
-  if (!store.sessionId) {
-    return
-  }
-
-  try {
-    const response = await axios.get('/api/user/validate', {
-      headers: {
-        Authorization: `Bearer ${store.sessionId}`
-      }
-    })
-
-    if (response.data.code === 200) {
-      store.setSession(store.sessionId, response.data.data)
-      return
-    }
-  } catch (error) {
-    // Ignore and clear stale session below.
-  }
-
-  store.logout()
-  if (route.path !== '/login' && route.path !== '/register') {
-    ElMessage.warning('登录状态已失效，请重新登录')
-    router.push('/login')
-  }
-}
+const activeMenu = computed(() => router.currentRoute.value.path)
 
 /**
  * 即使后端登出请求失败，也强制清空前端本地会话，避免界面继续误判为已登录。
@@ -140,10 +107,6 @@ const handleLogout = async () => {
   store.logout()
   router.push('/login')
 }
-
-onMounted(() => {
-  restoreSession()
-})
 </script>
 
 <style scoped>

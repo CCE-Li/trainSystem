@@ -12,11 +12,11 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Repository
 /**
  * 票务数据访问层。
  * 负责车票发布、停售、余票查询以及订单相关持久化操作。
  */
+@Repository
 public class TicketDao {
 
     private final SystemContextDao systemContextDao;
@@ -43,25 +43,26 @@ public class TicketDao {
     }
 
     /**
-     * 查询指定区段的剩余票数。
+     * 查询指定区间的剩余票数。
      */
-    public int queryRemainingTicket(String trainId, String departureTime, int stationId) {
+    public int queryRemainingTicket(String trainId, String departureTime, int departureStationId, int arrivalStationId) {
         return systemContextDao.getTrainSystem().queryRemainingTicket(
                 new FixedString(trainId),
                 new Time(departureTime),
-                new StationID(stationId)
+                new StationID(departureStationId),
+                new StationID(arrivalStationId)
         );
     }
 
     /**
      * 写入购票结果。
      */
-    public void orderTicket(BuyTicketRequest request, int stationId) {
-        int quantity = request.getQuantity() == null ? 1 : request.getQuantity();
+    public void orderTicket(BuyTicketRequest request, int departureStationId, int arrivalStationId, int quantity) {
         systemContextDao.getTrainSystem().orderTicket(
                 new FixedString(request.getTrainId()),
                 new Time(request.getDepartureTime()),
-                new StationID(stationId),
+                new StationID(departureStationId),
+                new StationID(arrivalStationId),
                 quantity
         );
     }
@@ -69,12 +70,12 @@ public class TicketDao {
     /**
      * 写入退票结果。
      */
-    public void refundTicket(RefundTicketRequest request, int stationId) {
-        int quantity = request.getQuantity() == null ? 1 : request.getQuantity();
+    public void refundTicket(RefundTicketRequest request, int departureStationId, int arrivalStationId, int quantity) {
         systemContextDao.getTrainSystem().refundTicket(
                 new FixedString(request.getTrainId()),
                 new Time(request.getDepartureTime()),
-                new StationID(stationId),
+                new StationID(departureStationId),
+                new StationID(arrivalStationId),
                 quantity
         );
     }

@@ -17,6 +17,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -54,8 +55,6 @@ public class TrainSystem {
         log.info("Loaded route sections from database");
 
         UserID adminID = new UserID(0L);
-        // Always keep a built-in admin account in storage, but never treat it as
-        // the currently logged-in user during service startup.
         if (!userManager.existUser(adminID)) {
             userManager.insertUser(adminID, "admin", "admin", StaticConfig.ADMIN_PRIVILEGE);
         }
@@ -126,8 +125,33 @@ public class TrainSystem {
         System.out.println("Ticket expired.");
     }
 
+    public int queryRemainingTicket(FixedString trainID, Time departureTime, StationID departureStation, StationID arrivalStation) {
+        TrainScheduler scheduler = schedulerManager.getScheduler(trainID);
+        SegmentRange range = resolveSegmentRange(scheduler, departureStation, arrivalStation);
+        Time baseTime = resolveBaseDepartureTime(scheduler, departureTime, range.departureIndex);
+
+        int remaining = Integer.MAX_VALUE;
+        for (int i = range.departureIndex; i < range.arrivalIndex; i++) {
+            int seat = ticketManager.querySeat(
+                    trainID,
+                    scheduler.getDepartureTimeAt(i, baseTime),
+                    scheduler.getStation(i).value()
+            );
+            if (seat < 0) {
+                return -1;
+            }
+            remaining = Math.min(remaining, seat);
+        }
+        return remaining == Integer.MAX_VALUE ? -1 : remaining;
+    }
+
     public int queryRemainingTicket(FixedString trainID, Time departureTime, StationID departureStation) {
-        return ticketManager.querySeat(trainID, departureTime, departureStation.value());
+        TrainScheduler scheduler = schedulerManager.getScheduler(trainID);
+        int departureIndex = resolveStationIndex(scheduler, departureStation);
+        if (departureIndex + 1 >= scheduler.getPassingStationNum()) {
+            throw new IllegalArgumentException("Departure station must not be the terminal station");
+        }
+        return queryRemainingTicket(trainID, departureTime, departureStation, scheduler.getStation(departureIndex + 1));
     }
 
     private boolean trySatisfyOrder() {
@@ -139,74 +163,42 @@ public class TrainSystem {
 
         System.out.println("Processing request from User " + purchaseInfo.getUserID().value());
 
-        if (purchaseInfo.isOrdering()) {
-            int remainingTickets = queryRemainingTicket(
-                    new TrainID(purchaseInfo.getTrainID().toString()),
-                    purchaseInfo.getDepartureTime(),
-                    purchaseInfo.getDepartureStation());
-            if (remainingTickets < purchaseInfo.getType()) {
-                System.out.println("No enough tickets or scheduler not exists. Order failed.");
-                return false;
-            }
-
-            TrainScheduler schedule = schedulerManager.getScheduler(new FixedString(purchaseInfo.getTrainID().toString()));
-            int id = schedule.findStation(purchaseInfo.getDepartureStation());
-            int duration = schedule.getDuration(id);
-            int price = schedule.getPrice(id);
-            StationID arrivalStation = schedule.getStation(id + 1);
-
-            ticketManager.updateSeat(
-                    new TrainID(purchaseInfo.getTrainID().toString()),
-                    purchaseInfo.getDepartureTime(),
-                    purchaseInfo.getDepartureStation().value(),
-                    -purchaseInfo.getType());
-            tripManager.addTrip(purchaseInfo.getUserID().value(), new TripInfo(
-                    purchaseInfo.getTrainID(),
-                    purchaseInfo.getDepartureStation(),
-                    arrivalStation,
-                    purchaseInfo.getType(),
-                    duration,
-                    price,
-                    purchaseInfo.getDepartureTime()
-            ));
-            System.out.println("Order succeeded.");
-            return true;
-        }
-
         try {
-            TrainScheduler schedule = schedulerManager.getScheduler(new FixedString(purchaseInfo.getTrainID().toString()));
-            if (schedule == null) {
-                log.warn("Refund failed: train not found {}", purchaseInfo.getTrainID());
-                return false;
+            TrainScheduler scheduler = schedulerManager.getScheduler(new FixedString(purchaseInfo.getTrainID().toString()));
+            SegmentRange range = resolveSegmentRange(scheduler, purchaseInfo.getDepartureStation(), purchaseInfo.getArrivalStation());
+            int quantity = Math.abs(purchaseInfo.getType());
+
+            if (purchaseInfo.isOrdering()) {
+                int remainingTickets = queryRemainingTicket(
+                        new TrainID(purchaseInfo.getTrainID().toString()),
+                        purchaseInfo.getDepartureTime(),
+                        purchaseInfo.getDepartureStation(),
+                        purchaseInfo.getArrivalStation()
+                );
+                if (remainingTickets < quantity) {
+                    System.out.println("No enough tickets or scheduler not exists. Order failed.");
+                    return false;
+                }
+
+                updateInventoryForRange(scheduler, purchaseInfo.getDepartureTime(), range, -quantity);
+                tripManager.addTrip(purchaseInfo.getUserID().value(), buildTripInfo(scheduler, purchaseInfo, range, quantity));
+                System.out.println("Order succeeded.");
+                return true;
             }
 
-            List<TripInfo> userTrips = tripManager.queryTrip(purchaseInfo.getUserID().value());
-            TripInfo targetTrip = null;
-            for (TripInfo trip : userTrips) {
-                if (trip.getTrainID().equals(purchaseInfo.getTrainID())
-                        && trip.getDepartureStation().equals(purchaseInfo.getDepartureStation())
-                        && trip.getDepartureTime().equals(purchaseInfo.getDepartureTime())
-                        && trip.getType() > 0) {
-                    targetTrip = trip;
-                    break;
-                }
-            }
-            if (targetTrip == null) {
+            List<TripInfo> userTrips = ticketTripMatches(purchaseInfo);
+            if (userTrips.isEmpty()) {
                 log.warn("Refund failed: order not found for user {}", purchaseInfo.getUserID().value());
                 return false;
             }
 
-            ticketManager.updateSeat(
-                    new TrainID(purchaseInfo.getTrainID().toString()),
-                    purchaseInfo.getDepartureTime(),
-                    purchaseInfo.getDepartureStation().value(),
-                    -purchaseInfo.getType());
-            tripManager.removeTrip(purchaseInfo.getUserID().value(), targetTrip);
+            consumeTripsForRefund(purchaseInfo.getUserID().value(), userTrips, quantity);
+            updateInventoryForRange(scheduler, purchaseInfo.getDepartureTime(), range, quantity);
             System.out.println("Refund succeeded.");
             return true;
         } catch (Exception e) {
-            log.error("Refund failed", e);
-            System.out.println("Refund failed: " + e.getMessage());
+            log.error("Order handling failed", e);
+            System.out.println("Order handling failed: " + e.getMessage());
             return false;
         }
     }
@@ -221,23 +213,30 @@ public class TrainSystem {
         }
     }
 
-    public void orderTicket(FixedString trainID, Time departureTime, StationID departureStation, int quantity) {
+    public void orderTicket(FixedString trainID, Time departureTime, StationID departureStation, StationID arrivalStation, int quantity) {
         waitingList.addToWaitingList(new PurchaseInfo(
                 currentUser.getUserID(),
                 new TrainID(trainID.toString()),
                 departureTime,
                 departureStation,
+                arrivalStation,
                 quantity));
         System.out.println("Ordering request has added to waiting list.");
         while (trySatisfyOrder()) {
         }
     }
 
+    public void orderTicket(FixedString trainID, Time departureTime, StationID departureStation, int quantity) {
+        TrainScheduler scheduler = schedulerManager.getScheduler(trainID);
+        int departureIndex = resolveStationIndex(scheduler, departureStation);
+        orderTicket(trainID, departureTime, departureStation, scheduler.getStation(departureIndex + 1), quantity);
+    }
+
     public void orderTicket(FixedString trainID, Time departureTime, StationID departureStation) {
         orderTicket(trainID, departureTime, departureStation, 1);
     }
 
-    public void refundTicket(FixedString trainID, Time departureTime, StationID departureStation, int quantity) {
+    public void refundTicket(FixedString trainID, Time departureTime, StationID departureStation, StationID arrivalStation, int quantity) {
         while (waitingList.isBusy()) {
             trySatisfyOrder();
         }
@@ -246,10 +245,17 @@ public class TrainSystem {
                 new TrainID(trainID.toString()),
                 departureTime,
                 departureStation,
+                arrivalStation,
                 -quantity));
         System.out.println("Refunding request has added to waiting list.");
         while (trySatisfyOrder()) {
         }
+    }
+
+    public void refundTicket(FixedString trainID, Time departureTime, StationID departureStation, int quantity) {
+        TrainScheduler scheduler = schedulerManager.getScheduler(trainID);
+        int departureIndex = resolveStationIndex(scheduler, departureStation);
+        refundTicket(trainID, departureTime, departureStation, scheduler.getStation(departureIndex + 1), quantity);
     }
 
     public void refundTicket(FixedString trainID, Time departureTime, StationID departureStation) {
@@ -276,8 +282,6 @@ public class TrainSystem {
             return;
         }
 
-        // New passwords are stored as hashes. Legacy plaintext records are still
-        // accepted once and upgraded immediately after a successful login.
         if (!PasswordHasher.matches(password, userInfo.getPassword())) {
             System.out.println("Wrong password. Login failed.");
             return;
@@ -313,7 +317,6 @@ public class TrainSystem {
         return uid.value();
     }
 
-    // The web API allows users to log in with either a numeric ID or a username.
     private UserInfo findUserByAccount(String account) {
         if (account == null || account.isBlank()) {
             return null;
@@ -329,8 +332,6 @@ public class TrainSystem {
         return userManager.findUserByUsername(normalized);
     }
 
-    // Registration now owns ID allocation so callers do not need to coordinate
-    // uniqueness or understand internal ID constraints.
     private UserID generateUserId() {
         for (int attempt = 0; attempt < 1000; attempt++) {
             long candidate = ThreadLocalRandom.current().nextLong(100000L, 1000000L);
@@ -387,5 +388,141 @@ public class TrainSystem {
         }
         userManager.modifyUserPrivilege(uid, newPrivilege);
         System.out.println("Modifiaction succeeded.");
+    }
+
+    private SegmentRange resolveSegmentRange(TrainScheduler scheduler, StationID departureStation, StationID arrivalStation) {
+        if (scheduler == null) {
+            throw new IllegalArgumentException("Train not found");
+        }
+
+        int departureIndex = resolveStationIndex(scheduler, departureStation);
+        int arrivalIndex = resolveStationIndexIncludingTerminal(scheduler, arrivalStation);
+        if (departureIndex < 0 || arrivalIndex < 0) {
+            throw new IllegalArgumentException("Station not found on the train route");
+        }
+        if (arrivalIndex <= departureIndex) {
+            throw new IllegalArgumentException("Arrival station must be after departure station");
+        }
+        return new SegmentRange(departureIndex, arrivalIndex);
+    }
+
+    private int resolveStationIndex(TrainScheduler scheduler, StationID station) {
+        if (scheduler == null) {
+            throw new IllegalArgumentException("Train not found");
+        }
+        for (int i = 0; i + 1 < scheduler.getPassingStationNum(); i++) {
+            if (scheduler.getStation(i).equals(station)) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Station not found on the train route");
+    }
+
+    private int resolveStationIndexIncludingTerminal(TrainScheduler scheduler, StationID station) {
+        if (scheduler == null) {
+            throw new IllegalArgumentException("Train not found");
+        }
+        for (int i = 0; i < scheduler.getPassingStationNum(); i++) {
+            if (scheduler.getStation(i).equals(station)) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Station not found on the train route");
+    }
+
+    private Time resolveBaseDepartureTime(TrainScheduler scheduler, Time departureTimeAtStation, int departureIndex) {
+        int minutesBeforeDeparture = 0;
+        for (int i = 0; i < departureIndex; i++) {
+            minutesBeforeDeparture += scheduler.getDuration(i);
+        }
+        return departureTimeAtStation.subtractMinutes(minutesBeforeDeparture);
+    }
+
+    private void updateInventoryForRange(TrainScheduler scheduler, Time departureTimeAtStation, SegmentRange range, int delta) {
+        Time baseTime = resolveBaseDepartureTime(scheduler, departureTimeAtStation, range.departureIndex);
+        for (int i = range.departureIndex; i < range.arrivalIndex; i++) {
+            int price = ticketManager.updateSeat(
+                    scheduler.getTrainID(),
+                    scheduler.getDepartureTimeAt(i, baseTime),
+                    scheduler.getStation(i).value(),
+                    delta
+            );
+            if (price < 0) {
+                throw new IllegalStateException("Ticket segment not found");
+            }
+        }
+    }
+
+    private TripInfo buildTripInfo(TrainScheduler scheduler, PurchaseInfo purchaseInfo, SegmentRange range, int quantity) {
+        int totalDuration = 0;
+        int totalPrice = 0;
+        for (int i = range.departureIndex; i < range.arrivalIndex; i++) {
+            totalDuration += scheduler.getDuration(i);
+            totalPrice += scheduler.getPrice(i);
+        }
+        return new TripInfo(
+                purchaseInfo.getTrainID(),
+                purchaseInfo.getDepartureStation(),
+                purchaseInfo.getArrivalStation(),
+                quantity,
+                totalDuration,
+                totalPrice,
+                purchaseInfo.getDepartureTime()
+        );
+    }
+
+    private List<TripInfo> ticketTripMatches(PurchaseInfo purchaseInfo) {
+        List<TripInfo> matches = new ArrayList<>();
+        for (TripInfo trip : tripManager.queryTrip(purchaseInfo.getUserID().value())) {
+            if (trip.getTrainID().equals(purchaseInfo.getTrainID())
+                    && trip.getDepartureStation().equals(purchaseInfo.getDepartureStation())
+                    && trip.getArrivalStation().equals(purchaseInfo.getArrivalStation())
+                    && trip.getDepartureTime().equals(purchaseInfo.getDepartureTime())
+                    && trip.getType() > 0) {
+                matches.add(trip);
+            }
+        }
+        return matches;
+    }
+
+    private void consumeTripsForRefund(long userId, List<TripInfo> trips, int quantity) {
+        int remaining = quantity;
+        for (TripInfo trip : trips) {
+            if (remaining <= 0) {
+                break;
+            }
+
+            tripManager.removeTrip(userId, trip);
+            int consumed = Math.min(trip.getTicketNumber(), remaining);
+            int leftover = trip.getTicketNumber() - consumed;
+            if (leftover > 0) {
+                TripInfo residual = new TripInfo(
+                        trip.getTrainID(),
+                        trip.getDepartureStation(),
+                        trip.getArrivalStation(),
+                        leftover,
+                        trip.getDuration(),
+                        trip.getPrice(),
+                        trip.getDepartureTime(),
+                        trip.getArrivalTime()
+                );
+                tripManager.addTrip(userId, residual);
+            }
+            remaining -= consumed;
+        }
+
+        if (remaining > 0) {
+            throw new IllegalStateException("Refund quantity exceeds owned tickets");
+        }
+    }
+
+    private static final class SegmentRange {
+        private final int departureIndex;
+        private final int arrivalIndex;
+
+        private SegmentRange(int departureIndex, int arrivalIndex) {
+            this.departureIndex = departureIndex;
+            this.arrivalIndex = arrivalIndex;
+        }
     }
 }

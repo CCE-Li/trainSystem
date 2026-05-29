@@ -93,6 +93,7 @@ const handleRefund = async (order) => {
       trainId: order.trainId,
       departureTime: order.departureTime,
       departureStation: order.departureStation,
+      arrivalStation: order.arrivalStation,
       quantity
     }, {
       headers: {

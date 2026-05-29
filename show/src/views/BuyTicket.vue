@@ -5,7 +5,7 @@
         <div class="panel-header">
           <div>
             <h3>在线购票</h3>
-            <p>按出发站、终点站和出发日期筛选可购买车票，并直接在列表中下单。</p>
+            <p>按出发站、到达站和出发日期筛选可购买区间，并直接下单。</p>
           </div>
           <el-tag :type="isLoggedIn ? 'success' : 'warning'" effect="dark">
             {{ isLoggedIn ? '已登录' : '需登录' }}
@@ -37,7 +37,7 @@
 
         <el-select
           v-model="filters.arrivalStation"
-          placeholder="选择终点站"
+          placeholder="选择到达站"
           filterable
           clearable
           class="filter-item"
@@ -59,26 +59,26 @@
           class="filter-item"
         />
 
-        <el-button type="primary" :loading="loading" @click="loadTickets">刷新列表</el-button>
+        <el-button type="primary" :loading="loading" @click="loadData">刷新列表</el-button>
       </div>
 
       <el-alert
         class="result-tip"
         type="info"
         :closable="false"
-        :title="`当前共筛选出 ${filteredTickets.length} 张可购买车票，第 ${pagination.page} / ${totalPages} 页`"
+        :title="`当前共筛选出 ${filteredTickets.length} 条可购买区间，第 ${pagination.page} / ${totalPages} 页`"
       />
 
       <el-table :data="paginatedTickets" class="ticket-table" stripe v-loading="loading">
         <el-table-column prop="departureTimeLabel" label="出发时间" width="180" sortable />
         <el-table-column prop="arrivalTimeLabel" label="到达时间" width="180" sortable />
         <el-table-column prop="departureStation" label="出发站" width="140" />
-        <el-table-column prop="arrivalStation" label="终点站" width="140" />
+        <el-table-column prop="arrivalStation" label="到达站" width="140" />
         <el-table-column prop="price" label="价格" width="100" sortable>
           <template #default="{ row }">¥{{ row.price }}</template>
         </el-table-column>
-        <el-table-column prop="durationLabel" label="途径时间" width="120" sortable />
-        <el-table-column prop="seatNum" label="剩余票数量" width="120" sortable />
+        <el-table-column prop="durationLabel" label="耗时" width="120" sortable />
+        <el-table-column prop="seatNum" label="余票" width="100" sortable />
         <el-table-column prop="trainId" label="车次" width="120" sortable />
         <el-table-column label="操作" width="130" fixed="right">
           <template #default="{ row }">
@@ -125,7 +125,8 @@ const store = useStore()
 
 const loading = ref(false)
 const buyingTrainId = ref('')
-const tickets = ref([])
+const segmentTickets = ref([])
+const trainSchedulers = ref([])
 const isLoggedIn = computed(() => Boolean(store.sessionId && store.userInfo))
 
 const filters = reactive({
@@ -152,7 +153,6 @@ const parseBackendTime = (value) => {
 
   const [month, day] = datePart.split('-').map(Number)
   const [hour, minute] = timePart.split(':').map(Number)
-
   if ([month, day, hour, minute].some(Number.isNaN)) {
     return null
   }
@@ -193,41 +193,149 @@ const formatDuration = (minutes) => {
   const total = Number(minutes)
   const hours = Math.floor(total / 60)
   const remainMinutes = total % 60
-
   if (hours === 0) {
-    return `${remainMinutes}分`
+    return `${remainMinutes}分钟`
   }
-
-  return `${hours}时${remainMinutes}分`
+  return `${hours}小时${remainMinutes}分钟`
 }
 
-const ticketRows = computed(() => {
-  return tickets.value
-    .map(ticket => {
-      const departureDate = parseBackendTime(ticket.departureTime)
-      const arrivalDate = departureDate ? new Date(departureDate.getTime() + Number(ticket.duration || 0) * 60000) : null
+const schedulesByTrainId = computed(() => {
+  const map = new Map()
+  trainSchedulers.value.forEach((scheduler) => {
+    map.set(scheduler.trainId, scheduler)
+  })
+  return map
+})
 
+const segmentRows = computed(() => {
+  return segmentTickets.value
+    .map((ticket) => {
+      const departureDate = parseBackendTime(ticket.departureTime)
       return {
         ...ticket,
         departureDate,
-        arrivalDate,
-        departureDateOnly: formatDateOnly(departureDate),
-        departureTimeLabel: formatDate(departureDate),
-        arrivalTimeLabel: formatDate(arrivalDate),
-        durationLabel: formatDuration(ticket.duration),
-        purchaseKey: `${ticket.trainId}-${ticket.departureStation}-${ticket.departureTime}`
+        departureDateOnly: formatDateOnly(departureDate)
       }
     })
-    .sort((a, b) => {
-      const left = a.departureDate?.getTime?.() || 0
-      const right = b.departureDate?.getTime?.() || 0
-      return left - right
+    .filter((ticket) => ticket.departureDate)
+})
+
+const buildRunKey = (trainId, baseDate) => {
+  return `${trainId}-${baseDate.toISOString()}`
+}
+
+const calculateRunBaseDate = (ticket, scheduler, segmentIndex) => {
+  const departureDate = parseBackendTime(ticket.departureTime)
+  if (!departureDate) {
+    return null
+  }
+
+  let offsetMinutes = 0
+  for (let i = 0; i < segmentIndex; i += 1) {
+    offsetMinutes += Number(scheduler.durations?.[i] || 0)
+  }
+  return new Date(departureDate.getTime() - offsetMinutes * 60000)
+}
+
+const journeyRows = computed(() => {
+  const groupedRuns = new Map()
+
+  segmentRows.value.forEach((ticket) => {
+    const scheduler = schedulesByTrainId.value.get(ticket.trainId)
+    if (!scheduler || !Array.isArray(scheduler.stations) || scheduler.stations.length < 2) {
+      return
+    }
+
+    const segmentIndex = scheduler.stations.findIndex((station, index) => {
+      if (index + 1 >= scheduler.stations.length) {
+        return false
+      }
+      return station === ticket.departureStation && scheduler.stations[index + 1] === ticket.arrivalStation
     })
+    if (segmentIndex < 0) {
+      return
+    }
+
+    const baseDate = calculateRunBaseDate(ticket, scheduler, segmentIndex)
+    if (!baseDate) {
+      return
+    }
+
+    const runKey = buildRunKey(ticket.trainId, baseDate)
+    if (!groupedRuns.has(runKey)) {
+      groupedRuns.set(runKey, {
+        trainId: ticket.trainId,
+        scheduler,
+        baseDate,
+        segments: new Map()
+      })
+    }
+
+    groupedRuns.get(runKey).segments.set(segmentIndex, ticket)
+  })
+
+  const journeys = []
+  groupedRuns.forEach(({ trainId, scheduler, baseDate, segments }) => {
+    const stations = scheduler.stations || []
+    const durations = scheduler.durations || []
+    const prices = scheduler.prices || []
+
+    for (let start = 0; start < stations.length - 1; start += 1) {
+      for (let end = start + 1; end < stations.length; end += 1) {
+        let valid = true
+        let remaining = Number.POSITIVE_INFINITY
+        let totalDuration = 0
+        let totalPrice = 0
+
+        for (let index = start; index < end; index += 1) {
+          const segment = segments.get(index)
+          if (!segment) {
+            valid = false
+            break
+          }
+          remaining = Math.min(remaining, Number(segment.seatNum))
+          totalDuration += Number(durations[index] || 0)
+          totalPrice += Number(prices[index] || 0)
+        }
+
+        if (!valid || !Number.isFinite(remaining)) {
+          continue
+        }
+
+        const departureSegment = segments.get(start)
+        const departureDate = parseBackendTime(departureSegment.departureTime)
+        const arrivalDate = departureDate ? new Date(departureDate.getTime() + totalDuration * 60000) : null
+
+        journeys.push({
+          trainId,
+          departureStation: stations[start],
+          arrivalStation: stations[end],
+          departureTime: departureSegment.departureTime,
+          seatNum: remaining,
+          price: totalPrice,
+          duration: totalDuration,
+          departureDate,
+          arrivalDate,
+          departureDateOnly: formatDateOnly(departureDate),
+          departureTimeLabel: formatDate(departureDate),
+          arrivalTimeLabel: formatDate(arrivalDate),
+          durationLabel: formatDuration(totalDuration),
+          purchaseKey: `${trainId}-${baseDate.toISOString()}-${stations[start]}-${stations[end]}`
+        })
+      }
+    }
+  })
+
+  return journeys.sort((left, right) => {
+    const leftTime = left.departureDate?.getTime?.() || 0
+    const rightTime = right.departureDate?.getTime?.() || 0
+    return leftTime - rightTime
+  })
 })
 
 const stationOptions = computed(() => {
   const set = new Set()
-  ticketRows.value.forEach(ticket => {
+  journeyRows.value.forEach((ticket) => {
     if (ticket.departureStation) {
       set.add(ticket.departureStation)
     }
@@ -246,7 +354,7 @@ const arrivalStationOptions = computed(() => {
   }
 
   const set = new Set()
-  ticketRows.value.forEach(ticket => {
+  journeyRows.value.forEach((ticket) => {
     if (ticket.departureStation === filters.departureStation && ticket.arrivalStation) {
       set.add(ticket.arrivalStation)
     }
@@ -255,7 +363,7 @@ const arrivalStationOptions = computed(() => {
 })
 
 const filteredTickets = computed(() => {
-  return ticketRows.value.filter(ticket => {
+  return journeyRows.value.filter((ticket) => {
     if (filters.departureStation && ticket.departureStation !== filters.departureStation) {
       return false
     }
@@ -308,23 +416,36 @@ watch(
   }
 )
 
-const loadTickets = async () => {
+const loadData = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/ticket/list', {
-      headers: {
-        Authorization: `Bearer ${store.sessionId}`
-      }
-    })
+    const [ticketsResponse, trainsResponse] = await Promise.all([
+      axios.get('/api/ticket/list', {
+        headers: {
+          Authorization: `Bearer ${store.sessionId}`
+        }
+      }),
+      axios.get('/api/train/list', {
+        headers: {
+          Authorization: `Bearer ${store.sessionId}`
+        }
+      })
+    ])
 
-    if (response.data.code === 200) {
-      tickets.value = response.data.data || []
+    if (ticketsResponse.data.code !== 200) {
+      ElMessage.error(ticketsResponse.data.message || '加载票务列表失败')
       return
     }
 
-    ElMessage.error(response.data.message || '加载票务列表失败')
+    if (trainsResponse.data.code !== 200) {
+      ElMessage.error(trainsResponse.data.message || '加载车次列表失败')
+      return
+    }
+
+    segmentTickets.value = ticketsResponse.data.data || []
+    trainSchedulers.value = trainsResponse.data.data || []
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '加载票务列表失败')
+    ElMessage.error(error.response?.data?.message || '加载票务数据失败')
   } finally {
     loading.value = false
   }
@@ -365,6 +486,7 @@ const handleBuy = async (ticket) => {
     const response = await axios.post('/api/ticket/buy', {
       trainId: ticket.trainId,
       departureStation: ticket.departureStation,
+      arrivalStation: ticket.arrivalStation,
       departureTime: ticket.departureTime,
       quantity
     }, {
@@ -375,7 +497,7 @@ const handleBuy = async (ticket) => {
 
     if (response.data.code === 200) {
       ElMessage.success('购票成功')
-      await loadTickets()
+      await loadData()
       return
     }
 
@@ -388,7 +510,7 @@ const handleBuy = async (ticket) => {
 }
 
 onMounted(() => {
-  loadTickets()
+  loadData()
 })
 </script>
 

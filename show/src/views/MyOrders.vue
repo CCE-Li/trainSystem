@@ -18,11 +18,11 @@
       <el-table-column prop="arrivalTime" label="到达时间" width="150" />
       <el-table-column prop="duration" label="时长(分钟)" width="110" />
       <el-table-column prop="price" label="票价" width="100" />
-      <el-table-column prop="ticketNumber" label="票数" width="80" />
+      <el-table-column prop="ticketNumber" label="已购数量" width="100" />
       <el-table-column label="操作" width="120" fixed="right">
         <template #default="{ row }">
           <el-button
-            v-if="row.ticketNumber > 0"
+            v-if="row.refundableCount > 0"
             type="danger"
             size="small"
             @click="handleRefund(row)"
@@ -71,16 +71,29 @@ const loadOrders = async () => {
 
 const handleRefund = async (order) => {
   try {
-    await ElMessageBox.confirm('确定要退掉这张票吗？', '退票确认', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
+    const { value } = await ElMessageBox.prompt(
+      `当前最多可退 ${order.refundableCount} 张，请输入退票数量`,
+      '退票确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputValue: '1',
+        inputPattern: /^[1-9]\d*$/,
+        inputErrorMessage: '请输入大于 0 的整数'
+      }
+    )
+
+    const quantity = Number(value)
+    if (quantity > order.refundableCount) {
+      ElMessage.warning(`当前最多可退 ${order.refundableCount} 张`)
+      return
+    }
 
     const response = await axios.post('/api/ticket/refund', {
       trainId: order.trainId,
       departureTime: order.departureTime,
-      departureStation: order.departureStation
+      departureStation: order.departureStation,
+      quantity
     }, {
       headers: {
         Authorization: `Bearer ${store.sessionId}`
@@ -94,7 +107,7 @@ const handleRefund = async (order) => {
       ElMessage.error(response.data.message || '退票失败')
     }
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.message || '退票失败')
     }
   }

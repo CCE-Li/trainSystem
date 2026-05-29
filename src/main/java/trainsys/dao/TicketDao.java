@@ -57,10 +57,12 @@ public class TicketDao {
      * 写入购票结果。
      */
     public void orderTicket(BuyTicketRequest request, int stationId) {
+        int quantity = request.getQuantity() == null ? 1 : request.getQuantity();
         systemContextDao.getTrainSystem().orderTicket(
                 new FixedString(request.getTrainId()),
                 new Time(request.getDepartureTime()),
-                new StationID(stationId)
+                new StationID(stationId),
+                quantity
         );
     }
 
@@ -68,10 +70,12 @@ public class TicketDao {
      * 写入退票结果。
      */
     public void refundTicket(RefundTicketRequest request, int stationId) {
+        int quantity = request.getQuantity() == null ? 1 : request.getQuantity();
         systemContextDao.getTrainSystem().refundTicket(
                 new FixedString(request.getTrainId()),
                 new Time(request.getDepartureTime()),
-                new StationID(stationId)
+                new StationID(stationId),
+                quantity
         );
     }
 

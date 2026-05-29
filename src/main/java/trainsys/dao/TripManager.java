@@ -63,12 +63,16 @@ public class TripManager {
      * 删除与给定行程完全匹配的一条订单记录。
      */
     public void removeTrip(long userID, TripInfo trip) {
-        tripInfoMapper.delete(new QueryWrapper<TripInfoEntity>()
+        TripInfoEntity entity = tripInfoMapper.selectOne(new QueryWrapper<TripInfoEntity>()
                 .eq("user_id", userID)
                 .eq("train_id", trip.getTrainID().toString())
                 .eq("departure_station", trip.getDepartureStation().value())
                 .eq("arrival_station", trip.getArrivalStation().value())
                 .eq("type", trip.getType())
-                .eq("departure_time", trip.getDepartureTime().toString()));
+                .eq("departure_time", trip.getDepartureTime().toString())
+                .last("LIMIT 1"));
+        if (entity != null && entity.getId() != null) {
+            tripInfoMapper.deleteById(entity.getId());
+        }
     }
 }

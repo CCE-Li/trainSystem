@@ -4,74 +4,76 @@
       <div class="panel-header">
         <div>
           <h3>余票查询</h3>
-          <p>按车次、出发站和发车时间查询剩余车票。</p>
+          <p>管理员可按条件统计当前已发售车票数量。</p>
         </div>
-        <el-tag type="success" effect="dark">实时查询</el-tag>
+        <el-tag type="success" effect="dark">管理员</el-tag>
       </div>
     </template>
 
-    <el-form label-position="top" class="query-grid">
-      <el-form-item label="车次">
-        <el-select
-          v-model="queryForm.trainId"
-          placeholder="请选择车次"
-          filterable
-          clearable
-          @change="handleTrainChange"
-        >
-          <el-option
-            v-for="train in trains"
-            :key="train.trainId"
-            :label="formatTrainLabel(train)"
-            :value="train.trainId"
-          />
-        </el-select>
-      </el-form-item>
-
-      <el-form-item label="出发站">
-        <el-select
-          v-model="queryForm.departureStation"
-          placeholder="请选择出发站"
-          filterable
-          clearable
-        >
-          <el-option
-            v-for="station in availableStations"
-            :key="station"
-            :label="station"
-            :value="station"
-          />
-        </el-select>
-      </el-form-item>
-
-      <el-form-item label="发车日期时间">
-        <el-date-picker
-          v-model="departureDateTime"
-          type="datetime"
-          placeholder="请选择发车日期时间"
-          format="YYYY-MM-DD HH:mm"
-          value-format="YYYY-MM-DD HH:mm"
+    <div class="query-grid">
+      <el-select
+        v-model="filters.trainId"
+        placeholder="请选择车次"
+        filterable
+        clearable
+        class="filter-item"
+      >
+        <el-option
+          v-for="train in trainOptions"
+          :key="train.trainId"
+          :label="formatTrainLabel(train)"
+          :value="train.trainId"
         />
-      </el-form-item>
-    </el-form>
+      </el-select>
 
-    <div class="action-row">
-      <el-button type="primary" :loading="loading" @click="handleQuery">查询余票</el-button>
+      <el-select
+        v-model="filters.departureStation"
+        placeholder="请选择出发站"
+        filterable
+        clearable
+        class="filter-item"
+      >
+        <el-option
+          v-for="station in departureStationOptions"
+          :key="station"
+          :label="station"
+          :value="station"
+        />
+      </el-select>
+
+      <el-select
+        v-model="filters.arrivalStation"
+        placeholder="请选择终点站"
+        filterable
+        clearable
+        class="filter-item"
+      >
+        <el-option
+          v-for="station in arrivalStationOptions"
+          :key="station"
+          :label="station"
+          :value="station"
+        />
+      </el-select>
+
+      <el-date-picker
+        v-model="filters.departureDate"
+        type="date"
+        placeholder="选择出发日期"
+        value-format="YYYY-MM-DD"
+        format="YYYY-MM-DD"
+        class="filter-item"
+      />
+
+      <el-button type="primary" :loading="loading" @click="loadTickets">刷新统计</el-button>
     </div>
 
-    <el-alert
-      v-if="selectedTrain"
-      class="train-tip"
-      type="info"
-      :closable="false"
-      :title="`当前路线：${selectedTrain.stations.join(' -> ')}`"
-    />
-
     <el-result
-      v-if="remaining !== null"
+      v-if="!loading"
       icon="success"
-      :title="`余票数量：${remaining}`"
-      sub-title="结果基于当前选择的车次、出发站和发车时间。"
+      :title="`车票数量：${filteredTicketCount}`"
+      sub-title="结果表示当前筛选条件下已发售车票记录数量。"
+      class="result-card"
     />
   </el-card>
 </template>
@@ -84,41 +86,109 @@ import { useStore } from '../store'
 
 const store = useStore()
 
-const trains = ref([])
 const loading = ref(false)
-const remaining = ref(null)
-const departureDateTime = ref('')
+const tickets = ref([])
+const trains = ref([])
 
-const queryForm = reactive({
+const filters = reactive({
   trainId: '',
   departureStation: '',
-  departureTime: ''
+  arrivalStation: '',
+  departureDate: ''
 })
 
-const selectedTrain = computed(() => {
-  return trains.value.find(train => train.trainId === queryForm.trainId) || null
-})
-
-const availableStations = computed(() => {
-  if (!selectedTrain.value?.stations?.length) {
-    return []
+const parseBackendTime = (value) => {
+  if (!value) {
+    return null
   }
-  return selectedTrain.value.stations.slice(0, -1)
-})
 
-const formatDepartureTime = (dateTime) => {
-  if (!dateTime) {
+  const normalized = value.replace('_', ' ')
+  const [timePart, datePart] = normalized.split(' ')
+  if (!timePart || !datePart) {
+    return null
+  }
+
+  const [month, day] = datePart.split('-').map(Number)
+  const [hour, minute] = timePart.split(':').map(Number)
+
+  if ([month, day, hour, minute].some(Number.isNaN)) {
+    return null
+  }
+
+  const year = new Date().getFullYear()
+  return new Date(year, month - 1, day, hour, minute)
+}
+
+const formatDateOnly = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return ''
   }
-  const [datePart, timePart] = dateTime.split(' ')
-  const [, month, day] = datePart.split('-')
-  return `${timePart} ${month}-${day}`
+
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 const formatTrainLabel = (train) => {
   const stationText = train.stations?.length ? train.stations.join(' -> ') : '暂无站点信息'
-  return `${train.trainId} | ${train.startTime} | ${stationText}`
+  const startTime = String(train.startTime || '').split(/[_ ]/)[0] || '-'
+  return `${train.trainId} | ${startTime} | ${stationText}`
 }
+
+const ticketRows = computed(() => {
+  return tickets.value.map(ticket => {
+    const departureDate = parseBackendTime(ticket.departureTime)
+    return {
+      ...ticket,
+      departureDateOnly: formatDateOnly(departureDate)
+    }
+  })
+})
+
+const trainOptions = computed(() => trains.value)
+
+const departureStationOptions = computed(() => {
+  const set = new Set()
+  ticketRows.value.forEach(ticket => {
+    if (!filters.trainId || ticket.trainId === filters.trainId) {
+      set.add(ticket.departureStation)
+    }
+  })
+  return Array.from(set)
+})
+
+const arrivalStationOptions = computed(() => {
+  const set = new Set()
+  ticketRows.value.forEach(ticket => {
+    if (filters.trainId && ticket.trainId !== filters.trainId) {
+      return
+    }
+    if (filters.departureStation && ticket.departureStation !== filters.departureStation) {
+      return
+    }
+    set.add(ticket.arrivalStation)
+  })
+  return Array.from(set)
+})
+
+const filteredTicketCount = computed(() => {
+  return ticketRows.value.filter(ticket => {
+    if (filters.trainId && ticket.trainId !== filters.trainId) {
+      return false
+    }
+    if (filters.departureStation && ticket.departureStation !== filters.departureStation) {
+      return false
+    }
+    if (filters.arrivalStation && ticket.arrivalStation !== filters.arrivalStation) {
+      return false
+    }
+    if (filters.departureDate && ticket.departureDateOnly !== filters.departureDate) {
+      return false
+    }
+    return ticket.seatNum >= 0
+  }).length
+})
 
 const loadTrains = async () => {
   try {
@@ -139,43 +209,30 @@ const loadTrains = async () => {
   }
 }
 
-const handleTrainChange = () => {
-  queryForm.departureStation = ''
-  remaining.value = null
-}
-
-const handleQuery = async () => {
-  queryForm.departureTime = formatDepartureTime(departureDateTime.value)
-
-  if (!queryForm.trainId || !queryForm.departureStation || !queryForm.departureTime) {
-    ElMessage.warning('请完整选择车次、出发站和发车日期时间')
-    return
-  }
-
+const loadTickets = async () => {
   loading.value = true
-  remaining.value = null
   try {
-    const response = await axios.post('/api/ticket/remaining', queryForm, {
+    const response = await axios.get('/api/ticket/list', {
       headers: {
         Authorization: `Bearer ${store.sessionId}`
       }
     })
 
     if (response.data.code === 200) {
-      remaining.value = response.data.data
+      tickets.value = response.data.data || []
       return
     }
 
-    ElMessage.error(response.data.message || '查询余票失败')
+    ElMessage.error(response.data.message || '加载票务数据失败')
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '查询余票失败')
+    ElMessage.error(error.response?.data?.message || '加载票务数据失败')
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  loadTrains()
+onMounted(async () => {
+  await Promise.all([loadTrains(), loadTickets()])
 })
 </script>
 
@@ -207,13 +264,14 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
+  align-items: end;
 }
 
-.action-row {
-  margin-top: 8px;
+.filter-item {
+  width: 100%;
 }
 
-.train-tip {
-  margin-top: 20px;
+.result-card {
+  margin-top: 28px;
 }
 </style>

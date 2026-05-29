@@ -84,7 +84,7 @@ const handleLogin = async () => {
       const { sessionId, user } = response.data.data
       store.setSession(sessionId, user)
       ElMessage.success('登录成功')
-      router.push('/ticket-query')
+      router.push(user?.privilege >= 10 ? '/ticket-query' : '/buy-ticket')
       return
     }
 

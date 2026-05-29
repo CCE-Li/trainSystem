@@ -71,6 +71,7 @@ router.beforeEach((to, from, next) => {
   const store = useStore()
   const publicPages = ['/login', '/register']
   const authRequired = !publicPages.includes(to.path)
+  const adminOnlyPages = ['/ticket-query', '/train-management', '/ticket-management']
 
   if (authRequired && !store.sessionId) {
     next('/login')
@@ -78,7 +79,12 @@ router.beforeEach((to, from, next) => {
   }
 
   if (store.sessionId && publicPages.includes(to.path)) {
-    next('/ticket-query')
+    next(store.userInfo?.privilege >= 10 ? '/ticket-query' : '/buy-ticket')
+    return
+  }
+
+  if (store.sessionId && adminOnlyPages.includes(to.path) && (!store.userInfo || store.userInfo.privilege < 10)) {
+    next('/buy-ticket')
     return
   }
 

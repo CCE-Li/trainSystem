@@ -15,5 +15,6 @@ public class TripInfoDTO {
     private Integer price;
     private String departureTime;  // HH:MM MM-DD格式
     private String arrivalTime;  // HH:MM MM-DD格式
+    private Integer refundableCount;  // 可退数量
 }
 

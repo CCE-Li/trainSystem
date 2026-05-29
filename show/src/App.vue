@@ -20,10 +20,6 @@
         </el-menu-item>
 
         <template v-if="userInfo">
-          <el-menu-item index="/ticket-query">
-            <el-icon><Search /></el-icon>
-            <span>余票查询</span>
-          </el-menu-item>
           <el-menu-item index="/buy-ticket">
             <el-icon><ShoppingCart /></el-icon>
             <span>在线购票</span>
@@ -42,6 +38,10 @@
           </el-menu-item>
 
           <template v-if="userInfo.privilege >= 10">
+            <el-menu-item index="/ticket-query">
+              <el-icon><Search /></el-icon>
+              <span>余票查询</span>
+            </el-menu-item>
             <el-menu-item index="/train-management">
               <el-icon><Management /></el-icon>
               <span>车次管理</span>

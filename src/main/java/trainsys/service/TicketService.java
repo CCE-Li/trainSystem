@@ -9,7 +9,9 @@ import trainsys.util.TrainScheduler;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 票务服务。
@@ -101,6 +103,11 @@ public class TicketService {
         userService.bindCurrentUser(sessionId);
 
         try {
+            int quantity = request.getQuantity() == null ? 1 : request.getQuantity();
+            if (quantity <= 0) {
+                return ApiResponse.error("购票数量必须大于 0");
+            }
+
             Integer stationId = routeDao.stationNameToId(request.getDepartureStation());
             if (stationId == null) {
                 return ApiResponse.error("站点不存在: " + request.getDepartureStation());
@@ -115,7 +122,7 @@ public class TicketService {
             if (remaining < 0) {
                 return ApiResponse.error("该车次该时间的车票尚未发售，请先发布车票");
             }
-            if (remaining == 0) {
+            if (remaining < quantity) {
                 return ApiResponse.error("余票不足，无法购票");
             }
 
@@ -139,24 +146,31 @@ public class TicketService {
         userService.bindCurrentUser(sessionId);
 
         try {
+            int quantity = request.getQuantity() == null ? 1 : request.getQuantity();
+            if (quantity <= 0) {
+                return ApiResponse.error("退票数量必须大于 0");
+            }
+
             Integer stationId = routeDao.stationNameToId(request.getDepartureStation());
             if (stationId == null) {
                 return ApiResponse.error("站点不存在: " + request.getDepartureStation());
             }
 
-            boolean hasOrder = false;
+            int ownedCount = 0;
             for (TripInfo trip : ticketDao.queryUserTrips(user.getUserID().value())) {
                 if (trip.getTrainID().toString().equals(request.getTrainId())
                         && trip.getDepartureStation().value() == stationId
                         && trip.getDepartureTime().toString().equals(request.getDepartureTime())
                         && trip.getType() > 0) {
-                    hasOrder = true;
-                    break;
+                    ownedCount += trip.getType();
                 }
             }
 
-            if (!hasOrder) {
+            if (ownedCount <= 0) {
                 return ApiResponse.error("您没有该订单，无法退票");
+            }
+            if (ownedCount < quantity) {
+                return ApiResponse.error("可退票数量不足");
             }
 
             if (trainDao.getScheduler(request.getTrainId()) == null) {
@@ -183,19 +197,30 @@ public class TicketService {
         userService.bindCurrentUser(sessionId);
 
         try {
-            List<TripInfoDTO> dtos = new ArrayList<>();
+            Map<String, TripInfoDTO> grouped = new LinkedHashMap<>();
             for (TripInfo trip : ticketDao.queryUserTrips(user.getUserID().value())) {
-                TripInfoDTO dto = new TripInfoDTO();
-                dto.setTrainId(trip.getTrainID().toString());
-                dto.setDepartureStation(routeDao.stationIdToName(trip.getDepartureStation().value()));
-                dto.setArrivalStation(routeDao.stationIdToName(trip.getArrivalStation().value()));
-                dto.setTicketNumber(trip.getTicketNumber());
-                dto.setDuration(trip.getDuration());
-                dto.setPrice(trip.getPrice());
-                dto.setDepartureTime(trip.getDepartureTime().toString());
-                dto.setArrivalTime(trip.getArrivalTime().toString());
-                dtos.add(dto);
+                String key = trip.getTrainID() + "|" + trip.getDepartureStation().value() + "|" + trip.getArrivalStation().value()
+                        + "|" + trip.getDepartureTime() + "|" + trip.getArrivalTime();
+                TripInfoDTO dto = grouped.get(key);
+                if (dto == null) {
+                    dto = new TripInfoDTO();
+                    dto.setTrainId(trip.getTrainID().toString());
+                    dto.setDepartureStation(routeDao.stationIdToName(trip.getDepartureStation().value()));
+                    dto.setArrivalStation(routeDao.stationIdToName(trip.getArrivalStation().value()));
+                    dto.setTicketNumber(0);
+                    dto.setRefundableCount(0);
+                    dto.setDuration(trip.getDuration());
+                    dto.setPrice(trip.getPrice());
+                    dto.setDepartureTime(trip.getDepartureTime().toString());
+                    dto.setArrivalTime(trip.getArrivalTime().toString());
+                    grouped.put(key, dto);
+                }
+                dto.setTicketNumber((dto.getTicketNumber() == null ? 0 : dto.getTicketNumber()) + trip.getTicketNumber());
+                if (trip.getTicketNumber() > 0) {
+                    dto.setRefundableCount((dto.getRefundableCount() == null ? 0 : dto.getRefundableCount()) + trip.getTicketNumber());
+                }
             }
+            List<TripInfoDTO> dtos = new ArrayList<>(grouped.values());
             return ApiResponse.success(dtos);
         } catch (Exception e) {
             return ApiResponse.error("查询订单失败: " + e.getMessage());

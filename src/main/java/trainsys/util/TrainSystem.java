@@ -221,19 +221,23 @@ public class TrainSystem {
         }
     }
 
-    public void orderTicket(FixedString trainID, Time departureTime, StationID departureStation) {
+    public void orderTicket(FixedString trainID, Time departureTime, StationID departureStation, int quantity) {
         waitingList.addToWaitingList(new PurchaseInfo(
                 currentUser.getUserID(),
                 new TrainID(trainID.toString()),
                 departureTime,
                 departureStation,
-                +1));
+                quantity));
         System.out.println("Ordering request has added to waiting list.");
         while (trySatisfyOrder()) {
         }
     }
 
-    public void refundTicket(FixedString trainID, Time departureTime, StationID departureStation) {
+    public void orderTicket(FixedString trainID, Time departureTime, StationID departureStation) {
+        orderTicket(trainID, departureTime, departureStation, 1);
+    }
+
+    public void refundTicket(FixedString trainID, Time departureTime, StationID departureStation, int quantity) {
         while (waitingList.isBusy()) {
             trySatisfyOrder();
         }
@@ -242,10 +246,14 @@ public class TrainSystem {
                 new TrainID(trainID.toString()),
                 departureTime,
                 departureStation,
-                -1));
+                -quantity));
         System.out.println("Refunding request has added to waiting list.");
         while (trySatisfyOrder()) {
         }
+    }
+
+    public void refundTicket(FixedString trainID, Time departureTime, StationID departureStation) {
+        refundTicket(trainID, departureTime, departureStation, 1);
     }
 
     public String findAllRoute(StationID departureID, StationID arrivalID) {

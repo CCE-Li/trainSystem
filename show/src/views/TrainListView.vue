@@ -26,7 +26,11 @@
       <el-table :data="filteredTrains" class="table" stripe v-loading="loading">
         <el-table-column prop="trainId" label="车次 ID" width="120" sortable />
         <el-table-column prop="seatNum" label="座位数" width="100" sortable />
-        <el-table-column prop="startTime" label="首发时间" width="150" sortable />
+        <el-table-column label="首发时间" width="150" sortable>
+          <template #default="{ row }">
+            <el-text>{{ formatStartTime(row.startTime) }}</el-text>
+          </template>
+        </el-table-column>
         <el-table-column label="站点路线" min-width="240">
           <template #default="{ row }">
             <el-text>{{ row.stations ? row.stations.join(' -> ') : '-' }}</el-text>
@@ -61,7 +65,7 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="车次 ID">{{ selectedTrain.trainId }}</el-descriptions-item>
           <el-descriptions-item label="座位数">{{ selectedTrain.seatNum }}</el-descriptions-item>
-          <el-descriptions-item label="首发时间">{{ selectedTrain.startTime }}</el-descriptions-item>
+          <el-descriptions-item label="首发时间">{{ formatStartTime(selectedTrain.startTime) }}</el-descriptions-item>
           <el-descriptions-item label="站点数">{{ selectedTrain.stations ? selectedTrain.stations.length : 0 }}</el-descriptions-item>
           <el-descriptions-item label="站点路线" :span="2">
             <el-tag
@@ -97,6 +101,15 @@ const loading = ref(false)
 const searchText = ref('')
 const detailDialogVisible = ref(false)
 const selectedTrain = ref(null)
+
+const formatStartTime = (value) => {
+  if (!value) {
+    return '-'
+  }
+
+  const [timePart] = String(value).split(/[_ ]/)
+  return timePart || '-'
+}
 
 const filteredTrains = computed(() => {
   if (!searchText.value) {

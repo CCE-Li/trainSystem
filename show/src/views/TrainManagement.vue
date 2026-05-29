@@ -42,9 +42,13 @@
       </el-tab-pane>
 
       <el-tab-pane label="查询车次" name="query">
-        <el-form :model="queryForm" label-position="top" class="narrow-form">
+        <el-form :model="queryForm" label-position="top" class="narrow-form" @submit.prevent>
           <el-form-item label="车次 ID">
-            <el-input v-model="queryForm.trainId" placeholder="请输入车次 ID" />
+            <el-input
+              v-model="queryForm.trainId"
+              placeholder="请输入车次 ID"
+              @keydown.enter.prevent="handleQuery"
+            />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleQuery" :loading="loading">查询</el-button>
@@ -55,7 +59,7 @@
           <h4>车次信息</h4>
           <p><strong>车次 ID：</strong>{{ trainInfo.trainId }}</p>
           <p><strong>座位数：</strong>{{ trainInfo.seatNum }}</p>
-          <p><strong>首发时间：</strong>{{ trainInfo.startTime }}</p>
+          <p><strong>首发时间：</strong>{{ formatStartTime(trainInfo.startTime) }}</p>
           <p><strong>站点：</strong>{{ trainInfo.stations.join(' -> ') }}</p>
           <p><strong>区段时长：</strong>{{ trainInfo.durations.join(' / ') }} 分钟</p>
           <p><strong>区段票价：</strong>{{ trainInfo.prices.join(' / ') }} 元</p>
@@ -90,6 +94,15 @@ const queryForm = reactive({
 })
 
 const trainInfo = ref(null)
+
+const formatStartTime = (value) => {
+  if (!value) {
+    return '-'
+  }
+
+  const [timePart] = String(value).split(/[_ ]/)
+  return timePart || '-'
+}
 
 const handleAdd = async () => {
   if (!addForm.trainId || !addForm.startTime || !addForm.stationsInput ||

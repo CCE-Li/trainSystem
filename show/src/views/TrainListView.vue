@@ -134,7 +134,6 @@ const loadTrains = async () => {
 
     if (response.data.code === 200) {
       trains.value = response.data.data || []
-      ElMessage.success('加载成功')
     } else {
       ElMessage.error(response.data.message || '加载失败')
     }

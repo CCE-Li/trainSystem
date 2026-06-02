@@ -116,12 +116,14 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Switch } from '@element-plus/icons-vue'
 import { useStore } from '../store'
 
 const store = useStore()
+const route = useRoute()
 
 const loading = ref(false)
 const buyingTrainId = ref('')
@@ -139,6 +141,22 @@ const pagination = reactive({
   page: 1,
   pageSize: 10
 })
+
+const applyRouteFilters = () => {
+  const departureStation = typeof route.query.departureStation === 'string'
+    ? route.query.departureStation
+    : ''
+  const arrivalStation = typeof route.query.arrivalStation === 'string'
+    ? route.query.arrivalStation
+    : ''
+  const departureDate = typeof route.query.departureDate === 'string'
+    ? route.query.departureDate
+    : ''
+
+  filters.departureStation = departureStation
+  filters.arrivalStation = arrivalStation
+  filters.departureDate = departureDate
+}
 
 const parseBackendTime = (value) => {
   if (!value) {
@@ -416,6 +434,14 @@ watch(
   }
 )
 
+watch(
+  () => route.query,
+  () => {
+    applyRouteFilters()
+  },
+  { deep: true }
+)
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -510,6 +536,7 @@ const handleBuy = async (ticket) => {
 }
 
 onMounted(() => {
+  applyRouteFilters()
   loadData()
 })
 </script>

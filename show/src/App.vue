@@ -1,94 +1,104 @@
 <template>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">TS</div>
-        <div>
-          <p class="brand-title">火车调度系统</p>
-          <p class="brand-subtitle">列车运行与调度控制台</p>
-        </div>
-      </div>
+  <!-- 用户端路由：由 UserLayout 自行渲染，此处只透传 router-view -->
+  <template v-if="isUserRoute">
+    <router-view />
+  </template>
 
-      <el-menu :default-active="activeMenu" router class="menu">
-        <el-menu-item v-if="!userInfo" index="/login">
-          <el-icon><User /></el-icon>
-          <span>登录</span>
-        </el-menu-item>
-        <el-menu-item v-if="!userInfo" index="/register">
-          <el-icon><UserFilled /></el-icon>
-          <span>注册</span>
-        </el-menu-item>
-
-        <template v-if="userInfo">
-          <el-menu-item index="/buy-ticket">
-            <el-icon><ShoppingCart /></el-icon>
-            <span>在线购票</span>
-          </el-menu-item>
-          <el-menu-item index="/my-orders">
-            <el-icon><Document /></el-icon>
-            <span>我的订单</span>
-          </el-menu-item>
-          <el-menu-item index="/route-query">
-            <el-icon><MapLocation /></el-icon>
-            <span>路线查询</span>
-          </el-menu-item>
-          <el-menu-item index="/train-list">
-            <el-icon><List /></el-icon>
-            <span>车次总览</span>
-          </el-menu-item>
-
-          <template v-if="userInfo.privilege >= 10">
-            <el-menu-item index="/ticket-query">
-              <el-icon><Search /></el-icon>
-              <span>余票查询</span>
-            </el-menu-item>
-            <el-menu-item index="/train-management">
-              <el-icon><Management /></el-icon>
-              <span>车次管理</span>
-            </el-menu-item>
-            <el-menu-item index="/ticket-management">
-              <el-icon><SetUp /></el-icon>
-              <span>票务管理</span>
-            </el-menu-item>
-          </template>
-        </template>
-      </el-menu>
-    </aside>
-
-    <main class="main-panel">
-      <header class="topbar">
-        <div>
-          <h1>火车调度系统</h1>
-          <p>统一处理列车调度、路线查询与运营管理</p>
-        </div>
-
-        <div v-if="userInfo" class="user-panel">
-          <div class="user-chip">
-            <strong>{{ userInfo.username }}</strong>
-            <span>ID {{ userInfo.userId }}</span>
+  <!-- 管理端/其他路由：使用管理布局 -->
+  <template v-else>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">TS</div>
+          <div>
+            <p class="brand-title">火车调度系统</p>
+            <p class="brand-subtitle">列车运行与调度控制台</p>
           </div>
-          <el-button type="danger" plain @click="handleLogout">退出登录</el-button>
         </div>
-      </header>
 
-      <section class="content">
-        <router-view />
-      </section>
-    </main>
-  </div>
+        <el-menu :default-active="activeMenu" router class="menu">
+          <el-menu-item v-if="!userInfo" index="/login">
+            <el-icon><User /></el-icon>
+            <span>登录</span>
+          </el-menu-item>
+          <el-menu-item v-if="!userInfo" index="/register">
+            <el-icon><UserFilled /></el-icon>
+            <span>注册</span>
+          </el-menu-item>
+
+          <template v-if="userInfo">
+            <el-menu-item index="/buy-ticket">
+              <el-icon><ShoppingCart /></el-icon>
+              <span>在线购票</span>
+            </el-menu-item>
+            <el-menu-item index="/my-orders">
+              <el-icon><Document /></el-icon>
+              <span>我的订单</span>
+            </el-menu-item>
+            <el-menu-item index="/route-query">
+              <el-icon><MapLocation /></el-icon>
+              <span>路线查询</span>
+            </el-menu-item>
+            <el-menu-item index="/train-list">
+              <el-icon><List /></el-icon>
+              <span>车次总览</span>
+            </el-menu-item>
+
+            <template v-if="userInfo.privilege >= 10">
+              <el-menu-item index="/ticket-query">
+                <el-icon><Search /></el-icon>
+                <span>余票查询</span>
+              </el-menu-item>
+              <el-menu-item index="/train-management">
+                <el-icon><Management /></el-icon>
+                <span>车次管理</span>
+              </el-menu-item>
+              <el-menu-item index="/ticket-management">
+                <el-icon><SetUp /></el-icon>
+                <span>票务管理</span>
+              </el-menu-item>
+            </template>
+          </template>
+        </el-menu>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <h1>火车票务管理系统</h1>
+            <p>统一处理火车票务、路线查询与运营管理</p>
+          </div>
+
+          <div v-if="userInfo" class="user-panel">
+            <div class="user-chip">
+              <strong>{{ userInfo.username }}</strong>
+              <span>ID {{ userInfo.userId }}</span>
+            </div>
+            <el-button type="danger" plain @click="handleLogout">退出登录</el-button>
+          </div>
+        </header>
+
+        <section class="content">
+          <router-view />
+        </section>
+      </main>
+    </div>
+  </template>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useStore } from './store'
 
 const router = useRouter()
+const route = useRoute()
 const store = useStore()
 
 const userInfo = computed(() => store.userInfo)
 const activeMenu = computed(() => router.currentRoute.value.path)
+const isUserRoute = computed(() => route.path.startsWith('/user/'))
 
 /**
  * 即使后端登出请求失败，也强制清空前端本地会话，避免界面继续误判为已登录。

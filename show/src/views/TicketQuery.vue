@@ -68,19 +68,68 @@
       <el-button type="primary" :loading="loading" @click="loadTickets">刷新统计</el-button>
     </div>
 
-    <el-result
-      v-if="!loading"
-      icon="success"
-      :title="`车票数量：${filteredTicketCount}`"
-      sub-title="结果表示当前筛选条件下已发售车票记录数量。"
-      class="result-card"
-    />
+    <!-- 统计概览 -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value">{{ filteredTicketCount }}</div>
+        <div class="stat-label">票务记录数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ totalSeats }}</div>
+        <div class="stat-label">总余票数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ filteredTicketCount > 0 ? Math.round(totalSeats / filteredTicketCount) : 0 }}</div>
+        <div class="stat-label">平均余票</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ soldOutCount }}</div>
+        <div class="stat-label">售罄区间</div>
+      </div>
+    </div>
+
+    <!-- 余票分布柱状图 -->
+    <div v-if="seatDistribution.length > 0" class="chart-section">
+      <h4>余票分布</h4>
+      <div class="bar-chart">
+        <div v-for="(item, index) in seatDistribution" :key="index" class="bar-item">
+          <div class="bar-label">{{ item.label }}</div>
+          <div class="bar-track">
+            <div
+              class="bar-fill"
+              :style="{ width: item.percent + '%', background: item.color }"
+            ></div>
+          </div>
+          <div class="bar-value">{{ item.count }}张</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 明细表格 -->
+    <el-table :data="filteredTickets" class="detail-table" stripe v-loading="loading" max-height="420">
+      <el-table-column prop="trainId" label="车次" width="120" />
+      <el-table-column prop="departureStation" label="出发站" width="120" />
+      <el-table-column prop="arrivalStation" label="到达站" width="120" />
+      <el-table-column label="出发时间" width="160">
+        <template #default="{ row }">{{ formatDepartureTime(row.departureTime) }}</template>
+      </el-table-column>
+      <el-table-column label="余票" width="140">
+        <template #default="{ row }">
+          <el-tag :type="getSeatStatus(row.seatNum).type" effect="dark" size="small">
+            {{ row.seatNum }}张 {{ getSeatStatus(row.seatNum).label }}
+          </el-tag>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-empty v-if="filteredTickets.length === 0 && !loading" description="暂无票务数据" />
   </el-card>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import axios from 'axios'
+import http from '../utils/http'
+import { parseBackendTime, formatDateOnly, formatDateTime, formatStartTime, getSeatStatus } from '../utils'
 import { ElMessage } from 'element-plus'
 import { useStore } from '../store'
 
@@ -97,43 +146,15 @@ const filters = reactive({
   departureDate: ''
 })
 
-const parseBackendTime = (value) => {
-  if (!value) {
-    return null
-  }
-
-  const normalized = value.replace('_', ' ')
-  const [timePart, datePart] = normalized.split(' ')
-  if (!timePart || !datePart) {
-    return null
-  }
-
-  const [month, day] = datePart.split('-').map(Number)
-  const [hour, minute] = timePart.split(':').map(Number)
-
-  if ([month, day, hour, minute].some(Number.isNaN)) {
-    return null
-  }
-
-  const year = new Date().getFullYear()
-  return new Date(year, month - 1, day, hour, minute)
-}
-
-const formatDateOnly = (date) => {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 const formatTrainLabel = (train) => {
-  const stationText = train.stations?.length ? train.stations.join(' -> ') : '暂无站点信息'
-  const startTime = String(train.startTime || '').split(/[_ ]/)[0] || '-'
+  const stationText = train.stations?.length ? train.stations.join(' → ') : '暂无站点信息'
+  const startTime = formatStartTime(train.startTime)
   return `${train.trainId} | ${startTime} | ${stationText}`
+}
+
+const formatDepartureTime = (value) => {
+  const date = parseBackendTime(value)
+  return formatDateTime(date) || value || '-'
 }
 
 const ticketRows = computed(() => {
@@ -161,48 +182,55 @@ const departureStationOptions = computed(() => {
 const arrivalStationOptions = computed(() => {
   const set = new Set()
   ticketRows.value.forEach(ticket => {
-    if (filters.trainId && ticket.trainId !== filters.trainId) {
-      return
-    }
-    if (filters.departureStation && ticket.departureStation !== filters.departureStation) {
-      return
-    }
+    if (filters.trainId && ticket.trainId !== filters.trainId) return
+    if (filters.departureStation && ticket.departureStation !== filters.departureStation) return
     set.add(ticket.arrivalStation)
   })
   return Array.from(set)
 })
 
-const filteredTicketCount = computed(() => {
+const filteredTickets = computed(() => {
   return ticketRows.value.filter(ticket => {
-    if (filters.trainId && ticket.trainId !== filters.trainId) {
-      return false
-    }
-    if (filters.departureStation && ticket.departureStation !== filters.departureStation) {
-      return false
-    }
-    if (filters.arrivalStation && ticket.arrivalStation !== filters.arrivalStation) {
-      return false
-    }
-    if (filters.departureDate && ticket.departureDateOnly !== filters.departureDate) {
-      return false
-    }
+    if (filters.trainId && ticket.trainId !== filters.trainId) return false
+    if (filters.departureStation && ticket.departureStation !== filters.departureStation) return false
+    if (filters.arrivalStation && ticket.arrivalStation !== filters.arrivalStation) return false
+    if (filters.departureDate && ticket.departureDateOnly !== filters.departureDate) return false
     return ticket.seatNum >= 0
-  }).length
+  })
+})
+
+const filteredTicketCount = computed(() => filteredTickets.value.length)
+
+const totalSeats = computed(() =>
+  filteredTickets.value.reduce((sum, t) => sum + Number(t.seatNum || 0), 0)
+)
+
+const soldOutCount = computed(() =>
+  filteredTickets.value.filter(t => Number(t.seatNum || 0) <= 0).length
+)
+
+const seatDistribution = computed(() => {
+  const sufficient = filteredTickets.value.filter(t => Number(t.seatNum) > 20).length
+  const limited = filteredTickets.value.filter(t => Number(t.seatNum) > 5 && Number(t.seatNum) <= 20).length
+  const tight = filteredTickets.value.filter(t => Number(t.seatNum) > 0 && Number(t.seatNum) <= 5).length
+  const soldOut = filteredTickets.value.filter(t => Number(t.seatNum) <= 0).length
+  const max = Math.max(sufficient, limited, tight, soldOut, 1)
+
+  return [
+    { label: '充足 (>20)', count: sufficient, percent: (sufficient / max) * 100, color: '#22c55e' },
+    { label: '较少 (6-20)', count: limited, percent: (limited / max) * 100, color: '#eab308' },
+    { label: '紧张 (1-5)', count: tight, percent: (tight / max) * 100, color: '#f97316' },
+    { label: '售罄 (0)', count: soldOut, percent: (soldOut / max) * 100, color: '#ef4444' }
+  ]
 })
 
 const loadTrains = async () => {
   try {
-    const response = await axios.get('/api/train/list', {
-      headers: {
-        Authorization: `Bearer ${store.sessionId}`
-      }
-    })
-
+    const response = await http.get('/api/train/list')
     if (response.data.code === 200) {
       trains.value = response.data.data || []
       return
     }
-
     ElMessage.error(response.data.message || '加载车次失败')
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '加载车次失败')
@@ -212,17 +240,11 @@ const loadTrains = async () => {
 const loadTickets = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/ticket/list', {
-      headers: {
-        Authorization: `Bearer ${store.sessionId}`
-      }
-    })
-
+    const response = await http.get('/api/ticket/list')
     if (response.data.code === 200) {
       tickets.value = response.data.data || []
       return
     }
-
     ElMessage.error(response.data.message || '加载票务数据失败')
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '加载票务数据失败')
@@ -271,7 +293,93 @@ onMounted(async () => {
   width: 100%;
 }
 
-.result-card {
-  margin-top: 28px;
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.stat-card {
+  padding: 20px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.stat-label {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.chart-section {
+  margin-top: 24px;
+}
+
+.chart-section h4 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: #334155;
+}
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar-label {
+  width: 90px;
+  font-size: 13px;
+  color: #475569;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.bar-track {
+  flex: 1;
+  height: 20px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.bar-value {
+  width: 60px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.detail-table {
+  margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

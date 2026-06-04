@@ -14,7 +14,7 @@
         </div>
 
         <div class="hero-copy">
-          <span class="eyebrow">Railway Passenger Experience</span>
+          <span class="eyebrow">旅客出行体验</span>
           <h1 class="hero-title">更顺畅的铁路出行<br>从这儿开始</h1>
           <p class="hero-text">
             欢迎使用我们的铁路客运系统，为您提供便捷、舒适的出行体验。
@@ -48,7 +48,7 @@
     <section class="section section-news">
       <div class="section-head">
         <div>
-          <span class="section-kicker">Homepage News</span>
+          <span class="section-kicker">最新动态</span>
           <h2 class="section-title">发现最新动态</h2>
         </div>
         <div class="section-switch">
@@ -93,7 +93,7 @@
     <section class="section section-figures">
       <div class="section-head compact">
         <div>
-          <span class="section-kicker">Key Figures</span>
+          <span class="section-kicker">关键数据</span>
           <h2 class="section-title">铁路服务关键数据</h2>
         </div>
       </div>
@@ -105,7 +105,7 @@
         </article>
 
         <article class="figure-card figure-stat highlight">
-          <span class="figure-overline">Capacity</span>
+          <span class="figure-overline">运力</span>
           <div class="figure-value">{{ stats.dailyPassengers }}+</div>
           <div class="figure-name">日均服务人次</div>
           <p class="figure-note">面向通勤、跨城和中长途场景提供稳定的购票与查询体验。</p>
@@ -117,7 +117,7 @@
         </article>
 
         <article class="figure-card figure-stat">
-          <span class="figure-overline">Coverage</span>
+          <span class="figure-overline">覆盖</span>
           <div class="mini-stats">
             <div class="mini-item">
               <strong>{{ stats.routes }}</strong>
@@ -139,7 +139,7 @@
     <section class="section section-actions">
       <div class="section-head compact">
         <div>
-          <span class="section-kicker">Quick Access</span>
+          <span class="section-kicker">快捷入口</span>
           <h2 class="section-title">常用功能入口</h2>
         </div>
       </div>
@@ -166,8 +166,9 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import http from '../../utils/http'
 import train001 from '../../assets/train_001.jpg'
 import train002 from '../../assets/train_002.jpg'
 import train003 from '../../assets/train_003.jpg'
@@ -176,15 +177,35 @@ import train004 from '../../assets/train_004.jpg'
 const router = useRouter()
 
 const stats = reactive({
-  trains: 128,
-  stations: 56,
-  routes: 43,
-  dailyPassengers: '2,500'
+  trains: 0,
+  stations: 0,
+  routes: 0,
+  dailyPassengers: '0'
 })
+
+const loadStats = async () => {
+  try {
+    const [trainsRes, stationsRes] = await Promise.all([
+      http.get('/api/train/list'),
+      http.get('/api/route/stations')
+    ])
+    if (trainsRes.data.code === 200) {
+      stats.trains = trainsRes.data.data?.length || 0
+    }
+    if (stationsRes.data.code === 200) {
+      stats.stations = stationsRes.data.data?.length || 0
+    }
+    // 计算路线数：站数-1 (粗略估计)
+    stats.routes = Math.max(stats.stations - 1, 0)
+    stats.dailyPassengers = stats.trains > 0 ? String(Math.round(stats.trains * 19.5)) : '0'
+  } catch {
+    // 加载失败保持默认值
+  }
+}
 
 const newsCards = [
   {
-    label: 'Ticketing',
+    label: '购票服务',
     title: '新版购票流程已上线，减少关键步骤切换。',
     desc: '更聚焦的流程布局把查询、筛选和确认订单压缩在更短的操作链路里。',
     cta: '前往购票',
@@ -193,7 +214,7 @@ const newsCards = [
     image: false
   },
   {
-    label: 'Operations',
+    label: '运营管理',
     title: '铁路运行环境规划科学、管理到位。',
     desc: '人车互不干扰，整体通行效率高、出行安全系数强，软硬件配套齐全，是兼具效率与舒适度的优质铁路运行空间。',
     cta: '查看车次',
@@ -202,7 +223,7 @@ const newsCards = [
     image: true
   },
   {
-    label: 'Network',
+    label: '线路查询',
     title: '线路查询页面支持更直观地查看出发地与目的地路线。',
     desc: '首页保留内容卡片入口，让首次访问用户更容易理解系统可完成的任务。',
     cta: '查看线路',
@@ -211,6 +232,10 @@ const newsCards = [
     image: false
   }
 ]
+
+onMounted(() => {
+  loadStats()
+})
 </script>
 
 <style scoped>

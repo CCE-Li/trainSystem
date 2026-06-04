@@ -10,8 +10,8 @@ if exist "pom.xml" (
 
 ping 127.0.0.1 -n 4 >nul
 
-if exist "show\package.json" if exist "show\node_modules" (
-    start "frontend-dev" cmd /k "cd /d ""%~dp0show"" && npm run dev"
+if exist "webui\package.json" if exist "webui\node_modules" (
+    start "frontend-dev" cmd /k "cd /d ""%~dp0webui"" && npm run dev"
     echo frontend success
 )
 

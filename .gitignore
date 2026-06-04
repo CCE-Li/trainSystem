@@ -29,3 +29,7 @@ logs/
 #*.db
 #*.db-shm
 #*.db-wal
+
+
+# 提示词
+.qoder/

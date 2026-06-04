@@ -89,7 +89,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import axios from 'axios'
+import http from './utils/http'
 import { useStore } from './store'
 
 const router = useRouter()
@@ -105,11 +105,7 @@ const isUserRoute = computed(() => route.path.startsWith('/user/'))
  */
 const handleLogout = async () => {
   try {
-    await axios.post('/api/user/logout', {}, {
-      headers: {
-        Authorization: `Bearer ${store.sessionId}`
-      }
-    })
+    await http.post('/api/user/logout')
   } catch (error) {
     // Clear local session even if backend logout fails.
   }

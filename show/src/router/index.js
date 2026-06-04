@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import axios from 'axios'
+import http from '../utils/http'
 import { useStore } from '../store'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
@@ -101,6 +101,11 @@ const routes = [
     path: '/train-list',
     name: 'TrainListView',
     component: TrainListView
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/NotFound.vue')
   }
 ]
 
@@ -123,11 +128,7 @@ const ensureSession = async (store) => {
   }
 
   if (!sessionValidationPromise) {
-    sessionValidationPromise = axios.get('/api/user/validate', {
-      headers: {
-        Authorization: `Bearer ${store.sessionId}`
-      }
-    }).then((response) => {
+    sessionValidationPromise = http.get('/api/user/validate').then((response) => {
       if (response.data.code === 200) {
         store.setSession(store.sessionId, response.data.data)
         sessionValidated = true

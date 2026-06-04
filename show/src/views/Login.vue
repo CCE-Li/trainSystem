@@ -1,7 +1,7 @@
 <template>
   <div class="auth-shell">
     <section class="hero">
-      <p class="eyebrow">Passenger Access</p>
+      <p class="eyebrow">旅客入口</p>
       <h2>进入票务控制台</h2>
       <p class="description">查询余票、下单购票、查看订单和路线信息，都从这里开始。</p>
     </section>
@@ -27,6 +27,9 @@
             @keyup.enter="handleLogin"
           />
         </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="rememberMe">记住登录状态</el-checkbox>
+        </el-form-item>
         <el-form-item class="actions">
           <el-button type="primary" :loading="loading" @click="handleLogin">登录</el-button>
           <el-button @click="router.push('/register')">去注册</el-button>
@@ -39,7 +42,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import http from '../utils/http'
 import { ElMessage } from 'element-plus'
 import { useStore } from '../store'
 
@@ -48,6 +51,7 @@ const store = useStore()
 
 const loginFormRef = ref()
 const loading = ref(false)
+const rememberMe = ref(false)
 
 const loginForm = reactive({
   account: '',
@@ -59,23 +63,20 @@ const rules = {
     { required: true, message: '请输入用户 ID 或用户名', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 4, message: '密码长度至少 4 位', trigger: 'blur' }
   ]
 }
 
 const handleLogin = async () => {
-  if (!loginFormRef.value) {
-    return
-  }
+  if (!loginFormRef.value) return
 
   const valid = await loginFormRef.value.validate().catch(() => false)
-  if (!valid) {
-    return
-  }
+  if (!valid) return
 
   loading.value = true
   try {
-    const response = await axios.post('/api/user/login', {
+    const response = await http.post('/api/user/login', {
       account: loginForm.account,
       password: loginForm.password
     })

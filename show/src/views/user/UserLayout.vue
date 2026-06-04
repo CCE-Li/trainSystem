@@ -105,7 +105,7 @@
           </button>
           <template #dropdown>
             <el-dropdown-menu class="dropdown-menu">
-              <el-dropdown-item class="dropdown-item">
+              <el-dropdown-item class="dropdown-item" @click="showUserInfo">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-right:8px">
                   <circle cx="8" cy="5" r="3" stroke="#083f79" stroke-width="1.2"/>
                   <path d="M2 15C2 11.5 4.5 9 8 9C11.5 9 14 11.5 14 15" stroke="#083f79" stroke-width="1.2" stroke-linecap="round"/>
@@ -142,10 +142,10 @@
             <span class="footer-brand-text">RAILWAY</span>
           </div>
           <div class="footer-links">
-            <a href="#">关于我们</a>
-            <a href="#">帮助中心</a>
-            <a href="#">服务条款</a>
-            <a href="#">隐私政策</a>
+            <a href="/user/home">关于我们</a>
+            <a href="/user/home">帮助中心</a>
+            <a href="/user/home">服务条款</a>
+            <a href="/user/home">隐私政策</a>
           </div>
         </div>
         <div class="footer-divider"></div>
@@ -160,7 +160,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import http from '../../utils/http'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useStore } from '../../store'
 import projectLogo from '../../assets/logo.png'
@@ -206,7 +206,7 @@ const swapQuickStations = () => {
 
 const loadStations = async () => {
   try {
-    const response = await axios.get('/api/route/stations')
+    const response = await http.get('/api/route/stations')
     if (response.data.code === 200) {
       stationOptions.value = response.data.data || []
       return
@@ -247,9 +247,7 @@ const handleLogout = async () => {
     })
 
     try {
-      await axios.post('/api/user/logout', {}, {
-        headers: { Authorization: `Bearer ${store.sessionId}` }
-      })
+      await http.post('/api/user/logout')
     } catch {
       // 后端登出失败也清除本地会话
     }
@@ -262,6 +260,22 @@ const handleLogout = async () => {
   }
 }
 
+const userInfoDialogVisible = ref(false)
+const showUserInfo = () => {
+  ElMessageBox.alert(
+    `<div style="line-height:2">
+      <div><strong>用户名：</strong>${userInfo?.username || '-'}</div>
+      <div><strong>用户 ID：</strong>${userInfo?.userId || '-'}</div>
+      <div><strong>权限级别：</strong>${userInfo?.privilege >= 10 ? '管理员' : '普通用户'}</div>
+    </div>`,
+    '个人信息',
+    {
+      dangerouslyUseHTMLString: true,
+      confirmButtonText: '关闭'
+    }
+  )
+}
+
 onMounted(() => {
   loadStations()
 })
@@ -270,8 +284,7 @@ onMounted(() => {
 <style scoped>
 /* ===== 全局变量 ===== */
 .user-shell {
-  --color-primary: #083f79;
-  --color-primary-light: #0d5aa7;
+  --color-primary: #083f79;  --color-primary-light: #0d5aa7;
   --color-primary-dark: #062e59;
   --color-accent: #f2d98b;
   --color-bg: #FFFFFF;
